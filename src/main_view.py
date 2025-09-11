@@ -9,6 +9,7 @@ from datetime import datetime
 from pandas import DataFrame
 from pathlib import Path
 import configparser
+import pandas as pd
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -308,6 +309,16 @@ class MainView(tk.Tk):
         print("[DEBUG] Current Defect List after deletion:")
         for item in self.defect_list:
             print(item)
+    
+    def read_defect_list_csv(self, filepath: str):
+        """ CSVファイルから不良リストを読み込み、defect_listに設定 """
+        try:
+            df = DataFrame(pd.read_csv(filepath))
+            self.defect_list = [tuple(row) for row in df.itertuples(index=False, name=None)]
+            self.update_defect_listbox()
+            messagebox.showinfo("Info", f"不良リストを {filepath} から読み込みました。")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
     def save_defect_info(self):
         insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
@@ -379,6 +390,13 @@ class MainView(tk.Tk):
             if self.current_board_index == item[0]:
                 self.defect_listbox.insert("", "end", values=[item[1], item[2], item[3]])
         self.defect_number_update()
+    
+    def update_index(self):
+        items = self.defect_list
+        # itemsから1つ目の要素をlistで取得
+        indices = [item[0] for item in items if isinstance(item[0], int)]
+        self.total_boards = max(indices) if indices else 1
+        self.current_board_index = 1
 
     def prev_board(self):
         if self.current_board_index > 1:
@@ -391,11 +409,11 @@ class MainView(tk.Tk):
             messagebox.showinfo("Info", "これ以上前の基板はありません。")
 
     def next_board(self):
-        path = "C:\\Users\\kentaroyoshida\\Documents\\image_coords_app"
         # defect_listを出力する
         df = DataFrame(self.defect_list, columns=["board_index", "No", "RF", "不良項目", "X", "Y", "日付"])
         # CSVとして保存
-        df.to_csv(os.path.join(path, "defect_list.csv"), index=False, encoding="utf-8-sig")
+        basename = f"{self.current_lot_number}.csv" if self.current_lot_number else "defect_list.csv"
+        df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
         self.update_board_label()
@@ -405,7 +423,18 @@ class MainView(tk.Tk):
 
     def update_board_label(self):
         self.board_no_label.config(text=f"{self.current_board_index} / {self.total_boards} 枚")
-    
+
+    def read_csv_path(self, lot_number: str):
+        """ 指図に対応するCSVファイルのパスを取得 """
+        if not self.data_directory:
+            messagebox.showwarning("Warning", "データディレクトリが設定されていません。設定を確認してください。")
+            return None
+        csv_filename = f"{lot_number}.csv"
+        csv_path = os.path.join(self.data_directory, csv_filename)
+        if not os.path.exists(csv_path):
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        return csv_path
+
     def open_settings(self):
         """ 設定ダイアログを開く """
         dialog = SettingsDialog(self)
@@ -435,13 +464,12 @@ class MainView(tk.Tk):
     def change_lot(self):
         """ 品目コードと指図を変更するダイアログを開く """
         dialog = LotChangeDialog(self)
+        if not hasattr(dialog, 'result') or not dialog.result:
+            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+            return
+            
         self.current_item_code = dialog.result[0]
         self.current_lot_number = dialog.result[1]
-
-        if self.current_lot_number and self.current_item_code:
-            messagebox.showinfo("Info", f"新しい品目コード: {self.current_item_code}, 指図: {self.current_lot_number} に変更されました。")
-        else:
-            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
 
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
         if self.image_directory and self.current_item_code:
@@ -462,6 +490,30 @@ class MainView(tk.Tk):
         self.model_label_value.config(text=model_name)
         self.board_label_value.config(text=board_name)
         self.lot_label_value.config(text=self.current_lot_number)
+
+        try:
+            # csvパスの取得
+            csv_path = self.read_csv_path(self.current_lot_number)
+            # csvパスが取得できたら不良リストを読み込み
+            if csv_path:
+                self.current_board_index = 1
+                self.read_defect_list_csv(csv_path)
+                self.update_index()
+                self.update_board_label()
+                self.defect_number_update()
+        except FileNotFoundError as e:
+            # 不良リストを初期化
+            self.defect_list = []
+            self.update_defect_listbox()
+            self.update_index()
+            self.update_board_label()
+            self.defect_number_update()
+
+        if self.current_lot_number and self.current_item_code:
+            messagebox.showinfo("Info", f"新しい品目コード: {self.current_item_code}, 指図: {self.current_lot_number} に変更されました。")
+        else:
+            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+            return
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
