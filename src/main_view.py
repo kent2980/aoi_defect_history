@@ -220,9 +220,23 @@ class MainView(tk.Tk):
 
 
     def open_image(self):
+        """ 画像を開くダイアログを表示し、選択された画像をcanvasに表示 """
         filepath = filedialog.askopenfilename(
             filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif"), ("All Files", "*.*")]
         )
+        if not filepath:
+            return
+        try:
+            image = Image.open(filepath)
+            image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
+            self.photo_image = ImageTk.PhotoImage(image)
+            self.canvas.delete("all")
+            self.canvas.create_image(self.canvas.winfo_width()//2, self.canvas.winfo_height()//2, image=self.photo_image, anchor="center")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open image:\n{e}")
+
+    def open_select_image(self, filepath: str):
+        """ 指定されたファイルパスの画像をcanvasに表示 """
         if not filepath:
             return
         try:
@@ -408,28 +422,47 @@ class MainView(tk.Tk):
     def change_lot(self):
         """ 品目コードと指図を変更するダイアログを開く """
         dialog = LotChangeDialog(self)
-        new_lot = dialog.result
-        if new_lot:
-            messagebox.showinfo("Info", f"新しい品目コード: {new_lot[0]}, 指図: {new_lot[1]} に変更されました。")
+        item_code = dialog.result[0]
+        lot_number = dialog.result[1]
+
+        if lot_number and item_code:
+            messagebox.showinfo("Info", f"新しい品目コード: {item_code}, 指図: {lot_number} に変更されました。")
         else:
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+
+        # 画像ディレクトリからitem_codeから始まる画像を探して表示
+        if self.image_directory and item_code:
+            for filename in os.listdir(self.image_directory):
+                if filename.startswith(item_code):
+                    image_path = os.path.join(self.image_directory, filename)
+                    self.open_select_image(image_path)
+                    break
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
         tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(row=0, columnspan=2)
         
+        # 品目コードエントリ
         tk.Label(master, text="品目コード:").grid(row=1, column=0, sticky="w")
         self.item_code_entry = tk.Entry(master)
         self.item_code_entry.grid(row=1, column=1, padx=5, pady=5)
         
+        # 指図エントリ
         tk.Label(master, text="指図:").grid(row=2, column=0, sticky="w")
         self.lot_entry = tk.Entry(master)
         self.lot_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        # Enterキーでlot_entryにフォーカスを移動
+        self.item_code_entry.bind("<Return>", self.on_enter)
         
         return self.item_code_entry  # 初期フォーカスをエントリに設定
 
     def apply(self):
         self.result = self.item_code_entry.get(), self.lot_entry.get()
+
+    def on_enter(self, event):
+        self.lot_entry.focus_set()  # lot_entryにフォーカスを移動
+        return "break"  # イベントの伝播を停止
 
 class SettingsDialog(simpledialog.Dialog):
 
