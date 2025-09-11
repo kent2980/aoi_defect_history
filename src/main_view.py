@@ -7,6 +7,10 @@ from PIL import Image, ImageTk
 import os
 from datetime import datetime
 from pandas import DataFrame
+from pathlib import Path
+import configparser
+
+PROJECT_DIR = Path(__file__).parent.parent
 
 class MainView(tk.Tk):
     def __init__(self):
@@ -18,6 +22,11 @@ class MainView(tk.Tk):
         self.option_add("*Label.Background", "white")
         self.state('zoomed')
         self.configure(bg="white")
+
+        # 設定読み込み
+        self.__read_settings()
+
+        # UI描画
         self.create_menu()
         self.create_header()
         self.create_defect_info_area()
@@ -34,11 +43,25 @@ class MainView(tk.Tk):
         self.total_boards = 1
         self.update_board_label()
 
+    def __read_settings(self):
+        """ """
+        settings_path = PROJECT_DIR / "settings.ini"
+        if settings_path.exists():
+            # 設定ファイルを読み込み
+            config = configparser.ConfigParser()
+            config.read(settings_path, encoding="utf-8")
+            # 例: 画像ディレクトリとデータディレクトリを取得
+            self.image_directory = config['DIRECTORIES'].get('image_directory', '')
+            self.data_directory = config['DIRECTORIES'].get('data_directory', '')
+
     def create_menu(self):
         menubar = tk.Menu(self)
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Open Image", command=self.open_image)
         menubar.add_cascade(label="File", menu=file_menu)
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        settings_menu.add_command(label="Settings", command=self.open_settings)
+        menubar.add_cascade(label="Settings", menu=settings_menu)
         self.config(menu=menubar)
     
     def create_header(self):
@@ -48,7 +71,7 @@ class MainView(tk.Tk):
         
         # フォント（Yu Gothic UI, Meiryo, Segoe UI）
         font_title = ("Yu Gothic UI", 16, "bold")
-        font_label = ("Yu Gothic UI", 12)
+        font_label = ("Yu Gothic UI", 10)
         font_value = ("Yu Gothic UI", 10)
         
         # タイトルラベル
@@ -71,10 +94,13 @@ class MainView(tk.Tk):
         # 下線のみ追加
         underline = tk.Frame(info_frame, bg="black", height=1)
         underline.pack(fill=tk.X, side=tk.BOTTOM)
+        # ロット切り替えボタン
+        lot_change_button = tk.Button(info_frame, text="指図切替", font=("Yu Gothic UI", 8), command=self.change_lot)
+        lot_change_button.pack(side=tk.LEFT, padx=5, pady=[0,5])
         # 機種名
         model_label = tk.Label(info_frame, text="機種名: ", font=font_label)
         model_label.pack(side=tk.LEFT, padx=10)
-        model_label_value = tk.Label(info_frame,width=40, text="MA-E350/LAD REV.2#ECOMOTT", font=font_value, anchor="w")
+        model_label_value = tk.Label(info_frame,width=30, text="MA-E350/LAD REV.2#ECOMOTT", font=font_value, anchor="w")
         model_label_value.pack(side=tk.LEFT)
         # 基板名
         board_label = tk.Label(info_frame, text="基板名: ", font=font_label)
@@ -101,8 +127,14 @@ class MainView(tk.Tk):
         aoi_user_label_value = tk.Label(user_frame, text="山田太郎", font=font_value, anchor="w", width=10)
         aoi_user_label_value.pack(side=tk.LEFT)
 
-        # 精査担当
-        inspect_user_label = tk.Label(user_frame, text="精査担当: ", font=font_label)
+        # 修理担当
+        inspect_user_label = tk.Label(user_frame, text="修理担当: ", font=font_label)
+        inspect_user_label.pack(side=tk.LEFT, padx=10)
+        inspect_user_label_value = tk.Label(user_frame, text="佐藤花子", font=font_value, anchor="w", width=10)
+        inspect_user_label_value.pack(side=tk.LEFT)
+
+        # 目視担当
+        inspect_user_label = tk.Label(user_frame, text="目視担当: ", font=font_label)
         inspect_user_label.pack(side=tk.LEFT, padx=10)
         inspect_user_label_value = tk.Label(user_frame, text="佐藤花子", font=font_value, anchor="w", width=10)
         inspect_user_label_value.pack(side=tk.LEFT)
@@ -346,3 +378,107 @@ class MainView(tk.Tk):
 
     def update_board_label(self):
         self.board_no_label.config(text=f"{self.current_board_index} / {self.total_boards} 枚")
+    
+    def open_settings(self):
+        """ 設定ダイアログを開く """
+        dialog = SettingsDialog(self)
+        new_settings = dialog.result
+        project_dir = PROJECT_DIR
+        print(f"[DEBUG] Project Directory: {project_dir}")
+        if new_settings:
+            # 新しい設定を適用
+            self.image_directory = new_settings[0]
+            self.data_directory = new_settings[1]
+            # 設定ファイルが存在しない場合は新規作成
+            settings_path = project_dir / "settings.ini"
+            if not settings_path.exists():
+                # 新しい設定を保存
+                config = configparser.ConfigParser()
+                config['DIRECTORIES'] = {
+                    'image_directory': new_settings[0],
+                    'data_directory': new_settings[1]
+                }
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
+            
+            messagebox.showinfo("Info", f"新しい設定: {new_settings[0]}, {new_settings[1]} に変更されました。")
+        else:
+            messagebox.showinfo("Info", "設定の変更がキャンセルされました。")
+
+    def change_lot(self):
+        """ 品目コードと指図を変更するダイアログを開く """
+        dialog = LotChangeDialog(self)
+        new_lot = dialog.result
+        if new_lot:
+            messagebox.showinfo("Info", f"新しい品目コード: {new_lot[0]}, 指図: {new_lot[1]} に変更されました。")
+        else:
+            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+
+class LotChangeDialog(simpledialog.Dialog):
+    def body(self, master):
+        tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(row=0, columnspan=2)
+        
+        tk.Label(master, text="品目コード:").grid(row=1, column=0, sticky="w")
+        self.item_code_entry = tk.Entry(master)
+        self.item_code_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        tk.Label(master, text="指図:").grid(row=2, column=0, sticky="w")
+        self.lot_entry = tk.Entry(master)
+        self.lot_entry.grid(row=2, column=1, padx=5, pady=5)
+        
+        return self.item_code_entry  # 初期フォーカスをエントリに設定
+
+    def apply(self):
+        self.result = self.item_code_entry.get(), self.lot_entry.get()
+
+class SettingsDialog(simpledialog.Dialog):
+
+    def __init__(self, parent):
+        self.__read_settings()
+        super().__init__(parent, title="設定")
+    
+    def __read_settings(self):
+        project_dir = PROJECT_DIR
+        settings_path = project_dir / "settings.ini"
+        if settings_path.exists():
+            config = configparser.ConfigParser()
+            config.read(settings_path, encoding="utf-8")
+            self.current_image_directory = config['DIRECTORIES'].get('image_directory', '')
+            self.current_data_directory = config['DIRECTORIES'].get('data_directory', '')
+        else:
+            self.current_image_directory = ''
+            self.current_data_directory = ''
+
+    def body(self, master):
+        tk.Label(master, text="データの保存場所を指定してください。").grid(row=0, columnspan=3, pady=10)
+        
+        # 画像ディレクトリ設定
+        tk.Label(master, text="画像ディレクトリ:").grid(row=1, column=0, sticky="w")
+        self.setting1_entry = tk.Entry(master, width=50)
+        self.setting1_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.setting1_entry.insert(0, self.current_image_directory)
+        tk.Button(master, text="参照", command=self.select_image_directory).grid(row=1, column=2, padx=5)
+        
+        # データディレクトリ設定
+        tk.Label(master, text="データディレクトリ:").grid(row=2, column=0, sticky="w")
+        self.setting2_entry = tk.Entry(master, width=50)
+        self.setting2_entry.grid(row=2, column=1, padx=5, pady=5)
+        self.setting2_entry.insert(0, self.current_data_directory)
+        tk.Button(master, text="参照", command=self.select_data_directory).grid(row=2, column=2, padx=5)
+        
+        return self.setting1_entry  # 初期フォーカスをエントリに設定
+
+    def select_image_directory(self):
+        directory = filedialog.askdirectory(title="画像ディレクトリを選択してください")
+        if directory:
+            self.setting1_entry.delete(0, tk.END)
+            self.setting1_entry.insert(0, directory)
+
+    def select_data_directory(self):
+        directory = filedialog.askdirectory(title="データディレクトリを選択してください")
+        if directory:
+            self.setting2_entry.delete(0, tk.END)
+            self.setting2_entry.insert(0, directory)
+
+    def apply(self):
+        self.result = self.setting1_entry.get(), self.setting2_entry.get()
