@@ -23,6 +23,10 @@ class MainView(tk.Tk):
         self.state('zoomed')
         self.configure(bg="white")
 
+        # ディレクトリ設定
+        self.image_directory = None
+        self.data_directory = None
+
         # 設定読み込み
         self.__read_settings()
 
@@ -36,12 +40,19 @@ class MainView(tk.Tk):
 
         # 現在の座標情報
         self.current_coordinates = None
+        
         # 不具合リスト
         self.defect_list = []
+        
         # 基板番号
         self.current_board_index = 1
         self.total_boards = 1
         self.update_board_label()
+
+        # 品目コード,指図,画像パス
+        self.current_item_code = None
+        self.current_lot_number = None
+        self.current_image_path = None
 
     def __read_settings(self):
         """ """
@@ -100,18 +111,18 @@ class MainView(tk.Tk):
         # 機種名
         model_label = tk.Label(info_frame, text="機種名: ", font=font_label)
         model_label.pack(side=tk.LEFT, padx=10)
-        model_label_value = tk.Label(info_frame,width=30, text="MA-E350/LAD REV.2#ECOMOTT", font=font_value, anchor="w")
-        model_label_value.pack(side=tk.LEFT)
+        self.model_label_value = tk.Label(info_frame,width=30, font=font_value, anchor="w")
+        self.model_label_value.pack(side=tk.LEFT)
         # 基板名
         board_label = tk.Label(info_frame, text="基板名: ", font=font_label)
         board_label.pack(side=tk.LEFT, padx=10)
-        board_label_value = tk.Label(info_frame, width=20, text="PL_KYM_AD集合基板", font=font_value, anchor="w")
-        board_label_value.pack(side=tk.LEFT)
+        self.board_label_value = tk.Label(info_frame, width=20, font=font_value, anchor="w")
+        self.board_label_value.pack(side=tk.LEFT)
         # 指図
         lot_label = tk.Label(info_frame, text="指図: ", font=font_label)
         lot_label.pack(side=tk.LEFT, padx=10)
-        lot_label_value = tk.Label(info_frame, width=12, text="1197949-10", font=font_value, anchor="w")
-        lot_label_value.pack(side=tk.LEFT)
+        self.lot_label_value = tk.Label(info_frame, width=12, font=font_value, anchor="w")
+        self.lot_label_value.pack(side=tk.LEFT)
 
         # ユーザーフレーム
         user_frame = tk.Frame(right_frame)
@@ -227,6 +238,7 @@ class MainView(tk.Tk):
         if not filepath:
             return
         try:
+            self.current_image_path = filepath
             image = Image.open(filepath)
             image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
             self.photo_image = ImageTk.PhotoImage(image)
@@ -240,6 +252,7 @@ class MainView(tk.Tk):
         if not filepath:
             return
         try:
+            self.current_image_path = filepath
             image = Image.open(filepath)
             image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
             self.photo_image = ImageTk.PhotoImage(image)
@@ -422,21 +435,33 @@ class MainView(tk.Tk):
     def change_lot(self):
         """ 品目コードと指図を変更するダイアログを開く """
         dialog = LotChangeDialog(self)
-        item_code = dialog.result[0]
-        lot_number = dialog.result[1]
+        self.current_item_code = dialog.result[0]
+        self.current_lot_number = dialog.result[1]
 
-        if lot_number and item_code:
-            messagebox.showinfo("Info", f"新しい品目コード: {item_code}, 指図: {lot_number} に変更されました。")
+        if self.current_lot_number and self.current_item_code:
+            messagebox.showinfo("Info", f"新しい品目コード: {self.current_item_code}, 指図: {self.current_lot_number} に変更されました。")
         else:
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
 
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
-        if self.image_directory and item_code:
+        if self.image_directory and self.current_item_code:
             for filename in os.listdir(self.image_directory):
-                if filename.startswith(item_code):
+                if filename.startswith(self.current_item_code):
                     image_path = os.path.join(self.image_directory, filename)
                     self.open_select_image(image_path)
                     break
+
+        # 画像名から機種情報を取得
+        if self.current_image_path:
+            baseName = os.path.basename(self.current_image_path)
+            parts = baseName.split('_')
+            model_name = parts[1] if len(parts) > 1 else ""
+            board_name = parts[2] if len(parts) > 2 else ""
+
+        # 各ラベルを更新
+        self.model_label_value.config(text=model_name)
+        self.board_label_value.config(text=board_name)
+        self.lot_label_value.config(text=self.current_lot_number)
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
