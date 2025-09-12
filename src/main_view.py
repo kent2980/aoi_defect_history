@@ -10,6 +10,7 @@ from pandas import DataFrame
 from pathlib import Path
 import configparser
 import pandas as pd
+import re
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -54,6 +55,7 @@ class MainView(tk.Tk):
         self.current_item_code = None
         self.current_lot_number = None
         self.current_image_path = None
+        self.current_image_filename = None
 
     def __read_settings(self):
         """ """
@@ -409,10 +411,12 @@ class MainView(tk.Tk):
             messagebox.showinfo("Info", "これ以上前の基板はありません。")
 
     def next_board(self):
+        if not self.current_image_filename:
+            raise ValueError("Current image filename is not set.")
         # defect_listを出力する
         df = DataFrame(self.defect_list, columns=["board_index", "No", "RF", "不良項目", "X", "Y", "日付"])
         # CSVとして保存
-        basename = f"{self.current_lot_number}.csv" if self.current_lot_number else "defect_list.csv"
+        basename = self.create_csv_filename()
         df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
@@ -424,12 +428,19 @@ class MainView(tk.Tk):
     def update_board_label(self):
         self.board_no_label.config(text=f"{self.current_board_index} / {self.total_boards} 枚")
 
-    def read_csv_path(self, lot_number: str):
+    def create_csv_filename(self):
+        """ 指図に対応するCSVファイル名を生成 """
+        if not self.current_lot_number:
+            raise ValueError("Current lot number is not set.")
+        if not self.current_image_filename:
+            raise ValueError("Current image filename is not set.")
+        return f"{self.current_lot_number}_{self.current_image_filename}.csv"
+
+    def read_csv_path(self):
         """ 指図に対応するCSVファイルのパスを取得 """
-        if not self.data_directory:
-            messagebox.showwarning("Warning", "データディレクトリが設定されていません。設定を確認してください。")
-            return None
-        csv_filename = f"{lot_number}.csv"
+        if not self.current_image_filename:
+            raise ValueError("Current image filename is not set.")
+        csv_filename = self.create_csv_filename()
         csv_path = os.path.join(self.data_directory, csv_filename)
         if not os.path.exists(csv_path):
             raise FileNotFoundError(f"CSV file not found: {csv_path}")
@@ -468,32 +479,47 @@ class MainView(tk.Tk):
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
             return
             
-        self.current_item_code = dialog.result[0]
+        self.current_item_code = dialog.result[0].upper()
         self.current_lot_number = dialog.result[1]
+
+        if self.is_validation_lot_name(self.current_lot_number) is False:
+            messagebox.showwarning("Warning", "指図の形式が不正です。例: 1234567-10")
+            self.current_item_code = None
+            self.current_lot_number = None
+            return
 
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
         if self.image_directory and self.current_item_code:
             for filename in os.listdir(self.image_directory):
                 if filename.startswith(self.current_item_code):
-                    image_path = os.path.join(self.image_directory, filename)
-                    self.open_select_image(image_path)
+                    self.current_image_path = os.path.join(self.image_directory, filename)
+                    self.open_select_image(self.current_image_path)
                     break
+            # 画像が見つからなかった場合
+            if not self.current_image_path:
+                self.current_image_path = None
+                self.current_item_code = None
+                self.current_lot_number = None
+                messagebox.showwarning("Warning", "指定された品目コードに対応する画像が見つかりません。")
+                return
 
         # 画像名から機種情報を取得
         if self.current_image_path:
-            baseName = os.path.basename(self.current_image_path)
+            baseName = os.path.basename(self.current_image_path).split(".")[0]
+            self.current_image_filename = baseName
             parts = baseName.split('_')
             model_name = parts[1] if len(parts) > 1 else ""
             board_name = parts[2] if len(parts) > 2 else ""
+            board_face = parts[3] if len(parts) > 3 else ""
 
         # 各ラベルを更新
         self.model_label_value.config(text=model_name)
-        self.board_label_value.config(text=board_name)
+        self.board_label_value.config(text=f"{board_name} {board_face}")
         self.lot_label_value.config(text=self.current_lot_number)
 
         try:
             # csvパスの取得
-            csv_path = self.read_csv_path(self.current_lot_number)
+            csv_path = self.read_csv_path()
             # csvパスが取得できたら不良リストを読み込み
             if csv_path:
                 self.current_board_index = 1
@@ -514,6 +540,13 @@ class MainView(tk.Tk):
         else:
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
             return
+
+    def is_validation_lot_name(self, lot_name: str) -> bool:
+        """ 指図名のバリデーション """
+        if not lot_name:
+            return False
+        regex = r'^\d{7}-10$|^\d{7}-20$'
+        return bool(re.match(regex, lot_name))
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
