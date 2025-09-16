@@ -534,6 +534,13 @@ class AOIView(tk.Toplevel):
 
     def change_lot(self):
         """ 品目コードと指図を変更するダイアログを開く """
+
+        # ユーザーが未設定の場合は警告を表示して終了
+        if not self.is_set_user():
+            messagebox.showwarning("Warning", "AOI担当が設定されていません。ユーザーを設定してください。")
+            return
+
+        # 品目コードと指図を入力するダイアログを表示
         dialog = LotChangeDialog(self)
         if not hasattr(dialog, 'result') or not dialog.result:
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
@@ -637,7 +644,11 @@ class AOIView(tk.Toplevel):
         self.user_name = matching_rows.values[0]
         # AOI担当ラベルを更新
         self.aoi_user_label_value.config(text=self.user_name)
-        messagebox.showinfo("Info", f"新しいユーザー名: {self.user_name} に変更されました。")
+    
+    def is_set_user(self) -> bool:
+        """ ユーザー名が設定されているか確認 """
+        user = self.aoi_user_label_value.cget("text")
+        return bool(user)
 
     def convert_defect_name(self):
         """ 不良項目名を変換する """
