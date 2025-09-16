@@ -14,9 +14,9 @@ import re
 
 PROJECT_DIR = Path(__file__).parent.parent
 
-class MainView(tk.Tk):
-    def __init__(self):
-        super().__init__()
+class MainView(tk.Toplevel):
+    def __init__(self, master=None):
+        super().__init__(master)
         self.title("AOI 製品経歴書")
         # 最大化表示
         self.option_add("*Background", "white")
@@ -56,6 +56,12 @@ class MainView(tk.Tk):
         self.current_lot_number = None
         self.current_image_path = None
         self.current_image_filename = None
+
+        # ユーザー名
+        self.user_name = None
+
+        # ユーザー切り替え
+        self.change_user()
 
     def __read_settings(self):
         """ """
@@ -105,22 +111,33 @@ class MainView(tk.Tk):
         # インフォフレーム
         info_frame = tk.Frame(right_frame)
         info_frame.pack(fill=tk.X,padx=10)
+        
         # 下線のみ追加
         underline = tk.Frame(info_frame, bg="black", height=1)
         underline.pack(fill=tk.X, side=tk.BOTTOM)
+        
         # ロット切り替えボタン
         lot_change_button = tk.Button(info_frame, text="指図切替", font=("Yu Gothic UI", 8), command=self.change_lot)
-        lot_change_button.pack(side=tk.LEFT, padx=5, pady=[0,5])
+        lot_change_button.pack(side=tk.LEFT, padx=5, pady=[0,2])
+        
         # 機種名
         model_label = tk.Label(info_frame, text="機種名: ", font=font_label)
         model_label.pack(side=tk.LEFT, padx=10)
         self.model_label_value = tk.Label(info_frame,width=30, font=font_value, anchor="w")
         self.model_label_value.pack(side=tk.LEFT)
+        
         # 基板名
         board_label = tk.Label(info_frame, text="基板名: ", font=font_label)
         board_label.pack(side=tk.LEFT, padx=10)
-        self.board_label_value = tk.Label(info_frame, width=20, font=font_value, anchor="w")
+        self.board_label_value = tk.Label(info_frame, width=15, font=font_value, anchor="w")
         self.board_label_value.pack(side=tk.LEFT)
+
+        # 面
+        side_label = tk.Label(info_frame, text="面: ", font=font_label)
+        side_label.pack(side=tk.LEFT, padx=10)
+        self.side_label_value = tk.Label(info_frame, width=5, font=font_value, anchor="w")
+        self.side_label_value.pack(side=tk.LEFT)
+        
         # 指図
         lot_label = tk.Label(info_frame, text="指図: ", font=font_label)
         lot_label.pack(side=tk.LEFT, padx=10)
@@ -135,24 +152,28 @@ class MainView(tk.Tk):
         underline_user = tk.Frame(user_frame, bg="black", height=1)
         underline_user.pack(fill=tk.X, side=tk.BOTTOM)
 
+        # ユーザー切り替えボタン
+        user_change_button = tk.Button(user_frame, text="ユーザー切替", font=("Yu Gothic UI", 8), command=self.change_user)
+        user_change_button.pack(side=tk.LEFT, padx=5, pady=[0,2])
+
         # AOI担当
         aoi_user_label = tk.Label(user_frame, text="AOI担当: ", font=font_label)
         aoi_user_label.pack(side=tk.LEFT, padx=10)
-        aoi_user_label_value = tk.Label(user_frame, text="山田太郎", font=font_value, anchor="w", width=10)
-        aoi_user_label_value.pack(side=tk.LEFT)
+        self.aoi_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.aoi_user_label_value.pack(side=tk.LEFT)
 
         # 修理担当
         inspect_user_label = tk.Label(user_frame, text="修理担当: ", font=font_label)
         inspect_user_label.pack(side=tk.LEFT, padx=10)
-        inspect_user_label_value = tk.Label(user_frame, text="佐藤花子", font=font_value, anchor="w", width=10)
-        inspect_user_label_value.pack(side=tk.LEFT)
+        self.inspect_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.inspect_user_label_value.pack(side=tk.LEFT)
 
         # 目視担当
         inspect_user_label = tk.Label(user_frame, text="目視担当: ", font=font_label)
         inspect_user_label.pack(side=tk.LEFT, padx=10)
-        inspect_user_label_value = tk.Label(user_frame, text="佐藤花子", font=font_value, anchor="w", width=10)
-        inspect_user_label_value.pack(side=tk.LEFT)
-    
+        self.inspect_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.inspect_user_label_value.pack(side=tk.LEFT)
+
     def create_defect_info_area(self):
 
         self.info_frame = tk.Frame(self)
@@ -323,23 +344,51 @@ class MainView(tk.Tk):
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
     def save_defect_info(self):
-        insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        current_board_index = self.current_board_index
-        defect_number = self.no_value.cget("text")
-        rf = self.rf_entry.get()
-        defect = self.defect_entry.get()
+        """ 不良情報をdefect_listに追加し、defect_listboxを更新 """
+        # 各種情報を取得
+        insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")  # 更新日時
+        current_board_index = self.current_board_index  # 現在の基板番号
+        defect_number = self.no_value.cget("text")  # 不良番号
+        rf = self.rf_entry.get().upper()    # リファレンス
+        defect = self.defect_entry.get()    # 不良項目
+        serial = self.serial_entry.get()  # シリアルNo
+        aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
+        model_code = self.current_item_code if self.current_item_code else ""
+        model_name = self.model_label_value.cget("text") if self.model_label_value.cget("text") else ""
+        lot_number = self.current_lot_number if self.current_lot_number else ""
+
+        # 座標を取得
         x, y = self.current_coordinates if self.current_coordinates else (None, None)
+
+        # 入力チェック
         if not rf or not defect:
             messagebox.showwarning("Warning", "RFと不良項目を入力してください。")
             return
         if x is None or y is None:
             messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
             return
-        defect = (current_board_index, defect_number, rf, defect, x, y, insert_date)
+        
+        # defect_listに追加
+        defect = (
+            current_board_index, 
+            defect_number, 
+            rf, 
+            defect, 
+            x, 
+            y, 
+            insert_date,
+            serial,
+            aoi_user,
+            model_code,
+            model_name,
+            lot_number
+            )
         self.defect_list_insert(defect)
+
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
         self.defect_entry.delete(0, tk.END)
+
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
         
@@ -413,17 +462,25 @@ class MainView(tk.Tk):
     def next_board(self):
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
-        # defect_listを出力する
-        df = DataFrame(self.defect_list, columns=["board_index", "No", "RF", "不良項目", "X", "Y", "日付"])
-        # CSVとして保存
-        basename = self.create_csv_filename()
-        df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
+        # 不良リストをCSVに保存
+        self.defect_list_to_csv()
+        # 画面を更新
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
         self.update_board_label()
         # treeviewを初期化
         self.update_defect_listbox()
         self.defect_number_update()
+    
+    def defect_list_to_csv(self):
+        """ defect_listをCSVファイルに保存 """
+        try:
+            columns = ["board_index", "No", "RF", "不良項目", "X", "Y", "日付", "シリアルNo", "AOI担当", "Y番", "機種名", "ロット番号"]
+            df = DataFrame(self.defect_list, columns=columns)
+            basename = self.create_csv_filename()
+            df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save defect list to CSV:\n{e}")
 
     def update_board_label(self):
         self.board_no_label.config(text=f"{self.current_board_index} / {self.total_boards} 枚")
@@ -510,11 +567,12 @@ class MainView(tk.Tk):
             parts = baseName.split('_')
             model_name = parts[1] if len(parts) > 1 else ""
             board_name = parts[2] if len(parts) > 2 else ""
-            board_face = parts[3] if len(parts) > 3 else ""
+            side_label = parts[3] if len(parts) > 3 else ""
 
         # 各ラベルを更新
         self.model_label_value.config(text=model_name)
-        self.board_label_value.config(text=f"{board_name} {board_face}")
+        self.board_label_value.config(text=board_name)
+        self.side_label_value.config(text=side_label)
         self.lot_label_value.config(text=self.current_lot_number)
 
         try:
@@ -547,6 +605,36 @@ class MainView(tk.Tk):
             return False
         regex = r'^\d{7}-10$|^\d{7}-20$'
         return bool(re.match(regex, lot_name))
+
+    def change_user(self):
+        """ ユーザー名を変更するダイアログを開く """
+        dialog = ChangeUserDialog(self)
+        if not hasattr(dialog, 'result') or not dialog.result:
+            messagebox.showinfo("Info", "ユーザー名の変更がキャンセルされました。")
+            return
+        user_id = dialog.result.upper()
+
+        # user.csvをDataFrameで読み込み
+        user_csv_path = PROJECT_DIR / "user.csv"
+        if not user_csv_path.exists():
+            raise FileNotFoundError(f"user.csv not found at {user_csv_path}")
+        df = pd.read_csv(user_csv_path)
+        user_ids = df['id'].tolist()
+        # user_ids内の要素を文字列に変換
+        user_ids = [str(uid) for uid in user_ids]
+        if user_id not in user_ids:
+            messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
+            return
+        # ユーザーIDに対応する名前を取得
+
+        matching_rows = df.loc[df['id'] == user_id, 'name']
+        if matching_rows.empty:
+            messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
+            return
+        self.user_name = matching_rows.values[0]
+        # AOI担当ラベルを更新
+        self.aoi_user_label_value.config(text=self.user_name)
+        messagebox.showinfo("Info", f"新しいユーザー名: {self.user_name} に変更されました。")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
@@ -625,3 +713,17 @@ class SettingsDialog(simpledialog.Dialog):
 
     def apply(self):
         self.result = self.setting1_entry.get(), self.setting2_entry.get()
+
+class ChangeUserDialog(simpledialog.Dialog):
+    def body(self, master):
+        tk.Label(master, text="新しいユーザーIDを入力してください。").grid(row=0, columnspan=2)
+        
+        # ユーザーエントリ
+        tk.Label(master, text="ユーザーID:").grid(row=1, column=0, sticky="w")
+        self.user_entry = tk.Entry(master)
+        self.user_entry.grid(row=1, column=1, padx=5, pady=5)
+        
+        return self.user_entry  # 初期フォーカスをエントリに設定
+
+    def apply(self):
+        self.result = self.user_entry.get()

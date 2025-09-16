@@ -1,5 +1,5 @@
-from src import MainView
+from src import ModeView
 
 if __name__ == "__main__":
-    app = MainView()
+    app = ModeView()
     app.mainloop()
