@@ -14,7 +14,7 @@ import re
 
 PROJECT_DIR = Path(__file__).parent.parent
 
-class AOIView(tk.Toplevel):
+class RepairView(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title("AOI 製品経歴書")
@@ -195,23 +195,18 @@ class AOIView(tk.Toplevel):
         # リファレンス
         rf_label = tk.Label(self.defect_info_frame, text="リファレンス: ", font=("Yu Gothic UI", 12))
         rf_label.pack(side=tk.LEFT, padx=10) 
-        self.rf_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
-        self.rf_entry.pack(side=tk.LEFT, padx=10)
+        self.rf_label_value = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=15, anchor="w")
+        self.rf_label_value.pack(side=tk.LEFT, padx=10)
 
         # 不良項目
         defect_label = tk.Label(self.defect_info_frame, text="不良項目: ", font=("Yu Gothic UI", 12))
         defect_label.pack(side=tk.LEFT, padx=10)
-        self.defect_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
-        self.defect_entry.pack(side=tk.LEFT, padx=10)
-        self.defect_entry.bind("<Return>", lambda event: self.convert_defect_name())
+        self.defect_label_value = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=15,  anchor="w")
+        self.defect_label_value.pack(side=tk.LEFT, padx=10)
 
-        # 保存ボタン
-        save_button = tk.Button(self.defect_info_frame, text="保存", font=("Yu Gothic UI", 10), command=self.save_defect_info)
-        save_button.pack(side=tk.LEFT, padx=20, pady=5)
-
-        # 削除ボタン
-        delete_button = tk.Button(self.defect_info_frame, text="削除", font=("Yu Gothic UI", 10), command=self.delete_defect_info)
-        delete_button.pack(side=tk.LEFT, padx=10, pady=5)
+        # 修理済みボタン
+        repair_button = tk.Button(self.defect_info_frame, text="修理済み", font=("Yu Gothic UI", 10), command=self.repair_defect)
+        repair_button.pack(side=tk.LEFT, padx=10)
 
         # 基板操作フレーム
         board_control_frame = tk.LabelFrame(self.info_frame, text="基板切替", font=("Yu Gothic UI", 10))
@@ -297,10 +292,8 @@ class AOIView(tk.Toplevel):
             # 選択中のアイテムの値を取得
             item_values = self.defect_listbox.item(selected_item[0], "values")
             self.no_value.config(text=item_values[0])   # No列を表示
-            self.rf_entry.delete(0, tk.END)             # RFエントリをクリア
-            self.rf_entry.insert(0, item_values[1])     # RFエントリに値を設定
-            self.defect_entry.delete(0, tk.END) # 不良項目エントリをクリア
-            self.defect_entry.insert(0, item_values[2]) # 不良項目エントリに値を設定
+            self.rf_label_value.config(text=item_values[1]) # RFラベルに値を設定
+            self.defect_label_value.config(text=item_values[2]) # 不良項目ラベルに値を設定
             index = int(item_values[0]) - 1 # Noは1始まりなので-1してインデックスに変換
             defect_item = self.defect_list[index]   # defect_listから選択中のアイテムを取得
             x, y = defect_item[4], defect_item[5]   # X, Y座標を取得
@@ -346,71 +339,6 @@ class AOIView(tk.Toplevel):
             messagebox.showinfo("Info", f"不良リストを {filepath} から読み込みました。")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
-
-    def save_defect_info(self):
-        """ 不良情報をdefect_listに追加し、defect_listboxを更新 """
-        # 不良番号を不良名に変換
-        self.convert_defect_name()
-        # 各種情報を取得
-        insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")  # 更新日時
-        current_board_index = self.current_board_index  # 現在の基板番号
-        defect_number = self.no_value.cget("text")  # 不良番号
-        rf = self.rf_entry.get().upper()    # リファレンス
-        defect = self.defect_entry.get()    # 不良項目
-        serial = self.serial_entry.get()  # シリアルNo
-        aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
-        model_code = self.current_item_code if self.current_item_code else ""
-        model_name = self.model_label_value.cget("text") if self.model_label_value.cget("text") else ""
-        lot_number = self.current_lot_number if self.current_lot_number else ""
-
-        # 座標を取得
-        x, y = self.current_coordinates if self.current_coordinates else (None, None)
-
-        # 入力チェック
-        if not rf or not defect:
-            messagebox.showwarning("Warning", "RFと不良項目を入力してください。")
-            return
-        if x is None or y is None:
-            messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
-            return
-        
-        # defect_listに追加
-        defect = (
-            current_board_index, 
-            defect_number, 
-            rf, 
-            defect, 
-            x, 
-            y, 
-            insert_date,
-            serial,
-            aoi_user,
-            model_code,
-            model_name,
-            lot_number
-            )
-        self.defect_list_insert(defect)
-
-        # 入力エントリを初期化
-        self.rf_entry.delete(0, tk.END)
-        self.defect_entry.delete(0, tk.END)
-
-        # 既存の座標マーカーを削除
-        self.canvas.delete("coordinate_marker")
-        
-    def delete_defect_info(self):
-        selected_item = self.defect_listbox.selection()
-        if selected_item: 
-            # Treeview内の全アイテムIDリスト
-            items = self.defect_listbox.get_children()
-            # インデックス（0始まり）
-            index = items.index(selected_item[0])
-            self.defect_list_delete(index, selected_item[0])
-            self.rf_entry.delete(0, tk.END)
-            self.defect_entry.delete(0, tk.END)
-            messagebox.showinfo("Info", "不良情報を削除しました。")
-        else:
-            messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
     
     def defect_listbox_no_reset(self):
         # self.defect_listboxのNo列を再設定
@@ -646,11 +574,11 @@ class AOIView(tk.Toplevel):
             return
         self.user_name = matching_rows.values[0]
         # AOI担当ラベルを更新
-        self.aoi_user_label_value.config(text=self.user_name)
+        self.repair_user_label_value.config(text=self.user_name)
     
     def is_set_user(self) -> bool:
         """ ユーザー名が設定されているか確認 """
-        user = self.aoi_user_label_value.cget("text")
+        user = self.repair_user_label_value.cget("text")
         return bool(user)
 
     def convert_defect_name(self):
@@ -686,6 +614,17 @@ class AOIView(tk.Toplevel):
         df['no'] = df['no'].apply(lambda x: int(x) if isinstance(x, float) and x.is_integer() else x)
         mapping_text = "\n".join([f"{row['no']}: {row['name']}" for _, row in df.iterrows()])
         messagebox.showinfo("不良名一覧", mapping_text)
+    
+    def repair_defect(self):
+        """ 選択中の項目の修理・未修理を切り替える """
+        selected_item = self.defect_listbox.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "修理する不良項目を選択してください。")
+            return
+        item_values = self.defect_listbox.item(selected_item[0], "values")
+        print(f"[DEBUG] Selected item values: {item_values}")
+        # item_valuesに値を追加
+        
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):

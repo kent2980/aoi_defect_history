@@ -1,5 +1,6 @@
 import tkinter as tk
-from .aoi_view import AOIView  # Assuming main_view.py contains MainView class
+from .repair_view import RepairView
+from .aoi_view import AOIView  
 
 class ModeView(tk.Tk):
     def __init__(self):
@@ -30,12 +31,13 @@ class ModeView(tk.Tk):
         
     def on_manufacture(self):
         print("AOI検査モードが選択されました。")
-        # ここにAOI検査モードの処理を追加
         self.withdraw()  # destroyではなく非表示にする
         app = AOIView(master=self)
         app.grab_set()   # 必要ならモーダルに
     
     def on_inspect(self):
         print("修理モードが選択されました。")
-        # ここに修理モードの処理を追加
+        self.withdraw()  # destroyではなく非表示にする
+        app = RepairView(master=self)
+        app.grab_set()   # 必要ならモーダルに
 
