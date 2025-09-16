@@ -200,6 +200,7 @@ class AOIView(tk.Toplevel):
         defect_label.pack(side=tk.LEFT, padx=10)
         self.defect_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
         self.defect_entry.pack(side=tk.LEFT, padx=10)
+        self.defect_entry.bind("<Return>", lambda event: self.convert_defect_name())
 
         # 保存ボタン
         save_button = tk.Button(self.defect_info_frame, text="保存", font=("Yu Gothic UI", 10), command=self.save_defect_info)
@@ -345,6 +346,8 @@ class AOIView(tk.Toplevel):
 
     def save_defect_info(self):
         """ 不良情報をdefect_listに追加し、defect_listboxを更新 """
+        # 不良番号を不良名に変換
+        self.convert_defect_name()
         # 各種情報を取得
         insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")  # 更新日時
         current_board_index = self.current_board_index  # 現在の基板番号
@@ -635,6 +638,32 @@ class AOIView(tk.Toplevel):
         # AOI担当ラベルを更新
         self.aoi_user_label_value.config(text=self.user_name)
         messagebox.showinfo("Info", f"新しいユーザー名: {self.user_name} に変更されました。")
+
+    def convert_defect_name(self):
+        """ 不良項目名を変換する """
+        defect_number = self.defect_entry.get()
+        if not defect_number:
+            return
+        # defect_numberがintに変換できない場合は例外をスロー
+        if not defect_number.isdigit():
+            print(f"[DEBUG] Defect number '{defect_number}' is not a valid integer.")
+            return
+        defect_number = int(defect_number)
+        # defect_mapping.csvをDataFrameで読み込み
+        mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
+        if not mapping_csv_path.exists():
+            raise FileNotFoundError(f"defect_mapping.csv not found at {mapping_csv_path}")
+        df = pd.read_csv(mapping_csv_path)
+        print(f"[DEBUG] Loaded defect mapping:\n{df}")
+        # defect_numberがdfの'alias'列に存在するか確認
+        if defect_number in df['no'].values:
+            # 対応する'name'列の値を取得してエントリに設定
+            standard_name = df.loc[df['no'] == defect_number, 'name'].values[0]
+            self.defect_entry.delete(0, tk.END)
+            self.defect_entry.insert(0, standard_name)
+            print(f"[DEBUG] Converted '{defect_number}' to standard name '{standard_name}'")
+        else:
+            print(f"[DEBUG] No conversion found for '{defect_number}'")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
