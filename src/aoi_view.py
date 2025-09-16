@@ -654,16 +654,12 @@ class AOIView(tk.Toplevel):
         if not mapping_csv_path.exists():
             raise FileNotFoundError(f"defect_mapping.csv not found at {mapping_csv_path}")
         df = pd.read_csv(mapping_csv_path)
-        print(f"[DEBUG] Loaded defect mapping:\n{df}")
         # defect_numberがdfの'alias'列に存在するか確認
         if defect_number in df['no'].values:
             # 対応する'name'列の値を取得してエントリに設定
             standard_name = df.loc[df['no'] == defect_number, 'name'].values[0]
             self.defect_entry.delete(0, tk.END)
             self.defect_entry.insert(0, standard_name)
-            print(f"[DEBUG] Converted '{defect_number}' to standard name '{standard_name}'")
-        else:
-            print(f"[DEBUG] No conversion found for '{defect_number}'")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
