@@ -14,7 +14,7 @@ import re
 
 PROJECT_DIR = Path(__file__).parent.parent
 
-class MainView(tk.Toplevel):
+class AOIView(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
         self.title("AOI 製品経歴書")

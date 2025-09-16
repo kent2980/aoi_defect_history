@@ -1,5 +1,5 @@
 import tkinter as tk
-from .main_view import MainView  # Assuming main_view.py contains MainView class
+from .aoi_view import AOIView  # Assuming main_view.py contains MainView class
 
 class ModeView(tk.Tk):
     def __init__(self):
@@ -32,7 +32,7 @@ class ModeView(tk.Tk):
         print("AOI検査モードが選択されました。")
         # ここにAOI検査モードの処理を追加
         self.withdraw()  # destroyではなく非表示にする
-        app = MainView(master=self)
+        app = AOIView(master=self)
         app.grab_set()   # 必要ならモーダルに
     
     def on_inspect(self):
