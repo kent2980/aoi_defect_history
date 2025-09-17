@@ -32,12 +32,12 @@ class ModeView(tk.Tk):
     def on_manufacture(self):
         print("AOI検査モードが選択されました。")
         self.withdraw()  # destroyではなく非表示にする
-        app = AOIView(master=self)
+        app = AOIView(master=self, fillColor="red")
         app.grab_set()   # 必要ならモーダルに
     
     def on_inspect(self):
         print("修理モードが選択されました。")
         self.withdraw()  # destroyではなく非表示にする
-        app = RepairView(master=self)
+        app = RepairView(master=self, fillColor="red")
         app.grab_set()   # 必要ならモーダルに
 

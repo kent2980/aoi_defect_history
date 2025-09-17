@@ -11,11 +11,15 @@ from pathlib import Path
 import configparser
 import pandas as pd
 import re
+from dataclasses import asdict
+from typing import List
+from .defect_info import DefectInfo
 
 PROJECT_DIR = Path(__file__).parent.parent
 
+
 class AOIView(tk.Toplevel):
-    def __init__(self, master=None):
+    def __init__(self, fillColor = "white", master=None):
         super().__init__(master)
         self.title("AOI 製品経歴書")
         # 最大化表示
@@ -24,6 +28,9 @@ class AOIView(tk.Toplevel):
         self.option_add("*Label.Background", "white")
         self.state('zoomed')
         self.configure(bg="white")
+
+        # 座標の塗りつぶし色
+        self.fillColor = fillColor
 
         # ディレクトリ設定
         self.image_directory = None
@@ -44,7 +51,7 @@ class AOIView(tk.Toplevel):
         self.current_coordinates = None
         
         # 不具合リスト
-        self.defect_list = []
+        self.defect_list:List[DefectInfo] = []
         
         # 基板番号
         self.current_board_index = 1
@@ -303,7 +310,7 @@ class AOIView(tk.Toplevel):
             self.defect_entry.insert(0, item_values[2]) # 不良項目エントリに値を設定
             index = int(item_values[0]) - 1 # Noは1始まりなので-1してインデックスに変換
             defect_item = self.defect_list[index]   # defect_listから選択中のアイテムを取得
-            x, y = defect_item[4], defect_item[5]   # X, Y座標を取得
+            x, y = defect_item.x, defect_item.y   # X, Y座標を取得
             
             # canvasに座標マーカーを表示
             if x is not None and y is not None:
@@ -311,16 +318,17 @@ class AOIView(tk.Toplevel):
                 # 既存の座標マーカーを削除
                 self.canvas.delete("coordinate_marker")
                 # 新しい座標マーカーを追加
-                self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="red", tags="coordinate_marker")
+                self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
     
     def defect_number_update(self):
-        filter_defect_list = [d for d in self.defect_list if d[0] == self.current_board_index]
+        filter_defect_list = [d for d in self.defect_list if d.current_board_index == self.current_board_index]
         max_len = len(filter_defect_list)
         self.no_value.config(text=str(max_len + 1))
 
-    def defect_list_insert(self, item: tuple):
+    def defect_list_insert(self, item: DefectInfo):
         self.defect_list.append(item)
-        self.defect_listbox.insert("", "end", values=[item[1], item[2], item[3]])
+        print(item)
+        self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
         self.defect_number_update()
         print("[DEBUG] Current Defect List:")
         for item in self.defect_list:
@@ -341,9 +349,8 @@ class AOIView(tk.Toplevel):
         """ CSVファイルから不良リストを読み込み、defect_listに設定 """
         try:
             df = DataFrame(pd.read_csv(filepath))
-            self.defect_list = [tuple(row) for row in df.itertuples(index=False, name=None)]
+            self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
             self.update_defect_listbox()
-            messagebox.showinfo("Info", f"不良リストを {filepath} から読み込みました。")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
@@ -356,7 +363,7 @@ class AOIView(tk.Toplevel):
         current_board_index = self.current_board_index  # 現在の基板番号
         defect_number = self.no_value.cget("text")  # 不良番号
         rf = self.rf_entry.get().upper()    # リファレンス
-        defect = self.defect_entry.get()    # 不良項目
+        defect_name = self.defect_entry.get()    # 不良項目
         serial = self.serial_entry.get()  # シリアルNo
         aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
         model_code = self.current_item_code if self.current_item_code else ""
@@ -367,7 +374,7 @@ class AOIView(tk.Toplevel):
         x, y = self.current_coordinates if self.current_coordinates else (None, None)
 
         # 入力チェック
-        if not rf or not defect:
+        if not rf or not defect_name:
             messagebox.showwarning("Warning", "RFと不良項目を入力してください。")
             return
         if x is None or y is None:
@@ -375,20 +382,20 @@ class AOIView(tk.Toplevel):
             return
         
         # defect_listに追加
-        defect = (
-            current_board_index, 
-            defect_number, 
-            rf, 
-            defect, 
-            x, 
-            y, 
-            insert_date,
-            serial,
-            aoi_user,
-            model_code,
-            model_name,
-            lot_number
-            )
+        defect = DefectInfo(
+            current_board_index=current_board_index,
+            defect_number=defect_number,
+            reference=rf,
+            defect_name=defect_name,
+            x=x,
+            y=y,
+            insert_date=insert_date,
+            serial=serial,
+            aoi_user=aoi_user,
+            model_code=model_code,
+            model_name=model_name,
+            lot_number=lot_number
+        )
         self.defect_list_insert(defect)
 
         # 入力エントリを初期化
@@ -397,6 +404,9 @@ class AOIView(tk.Toplevel):
 
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
+
+        # self.defect_listをCSVに保存
+        self.defect_list_to_csv()
         
     def delete_defect_info(self):
         selected_item = self.defect_listbox.selection()
@@ -438,20 +448,20 @@ class AOIView(tk.Toplevel):
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
         # 新しい座標マーカーを追加
-        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="red", tags="coordinate_marker")
+        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
         
     def update_defect_listbox(self):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
-            if self.current_board_index == item[0]:
-                self.defect_listbox.insert("", "end", values=[item[1], item[2], item[3]])
+            if self.current_board_index == item.current_board_index:
+                self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
         self.defect_number_update()
     
     def update_index(self):
         items = self.defect_list
         # itemsから1つ目の要素をlistで取得
-        indices = [item[0] for item in items if isinstance(item[0], int)]
+        indices = [item.current_board_index for item in items if isinstance(item.current_board_index, int)]
         self.total_boards = max(indices) if indices else 1
         self.current_board_index = 1
 
@@ -481,8 +491,7 @@ class AOIView(tk.Toplevel):
     def defect_list_to_csv(self):
         """ defect_listをCSVファイルに保存 """
         try:
-            columns = ["board_index", "No", "RF", "不良項目", "X", "Y", "日付", "シリアルNo", "AOI担当", "Y番", "機種名", "ロット番号"]
-            df = DataFrame(self.defect_list, columns=columns)
+            df = DataFrame([asdict(item) for item in self.defect_list])
             basename = self.create_csv_filename()
             df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
         except Exception as e:
@@ -606,9 +615,7 @@ class AOIView(tk.Toplevel):
             self.update_board_label()
             self.defect_number_update()
 
-        if self.current_lot_number and self.current_item_code:
-            messagebox.showinfo("Info", f"新しい品目コード: {self.current_item_code}, 指図: {self.current_lot_number} に変更されました。")
-        else:
+        if not (self.current_lot_number and self.current_item_code):
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
             return
 

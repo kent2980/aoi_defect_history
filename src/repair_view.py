@@ -11,11 +11,16 @@ from pathlib import Path
 import configparser
 import pandas as pd
 import re
+from dataclasses import asdict
+from typing import List
+from .defect_info import DefectInfo
+from .repaird_info import RepairdInfo
 
 PROJECT_DIR = Path(__file__).parent.parent
 
+
 class RepairView(tk.Toplevel):
-    def __init__(self, master=None):
+    def __init__(self, fillColor = "white", master=None):
         super().__init__(master)
         self.title("AOI 製品経歴書")
         # 最大化表示
@@ -24,6 +29,9 @@ class RepairView(tk.Toplevel):
         self.option_add("*Label.Background", "white")
         self.state('zoomed')
         self.configure(bg="white")
+
+        # 座標の塗りつぶし色
+        self.fillColor = fillColor
 
         # ディレクトリ設定
         self.image_directory = None
@@ -43,9 +51,10 @@ class RepairView(tk.Toplevel):
         # 現在の座標情報
         self.current_coordinates = None
         
-        # 不具合リスト
-        self.defect_list = []
-        
+        # リスト
+        self.defect_list:List[DefectInfo] = []
+        self.repaird_list:List[RepairdInfo] = []
+
         # 基板番号
         self.current_board_index = 1
         self.total_boards = 1
@@ -195,18 +204,32 @@ class RepairView(tk.Toplevel):
         # リファレンス
         rf_label = tk.Label(self.defect_info_frame, text="リファレンス: ", font=("Yu Gothic UI", 12))
         rf_label.pack(side=tk.LEFT, padx=10) 
-        self.rf_label_value = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=15, anchor="w")
-        self.rf_label_value.pack(side=tk.LEFT, padx=10)
+        self.rf_entry = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=10, anchor="w")
+        self.rf_entry.pack(side=tk.LEFT, padx=10)
 
         # 不良項目
         defect_label = tk.Label(self.defect_info_frame, text="不良項目: ", font=("Yu Gothic UI", 12))
         defect_label.pack(side=tk.LEFT, padx=10)
-        self.defect_label_value = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=15,  anchor="w")
-        self.defect_label_value.pack(side=tk.LEFT, padx=10)
+        self.defect_entry = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=15, anchor="w")
+        self.defect_entry.pack(side=tk.LEFT, padx=10)
+
+        # 分類
+        parts_type_label = tk.Label(self.defect_info_frame, text="分類: ", font=("Yu Gothic UI", 12))
+        parts_type_label.pack(side=tk.LEFT, padx=10)
+        self.parts_type_entry = tk.Label(self.defect_info_frame, font=("Yu Gothic UI", 12), width=6, anchor="w")
+        self.parts_type_entry.pack(side=tk.LEFT, padx=10)
+
+        # 「C/R」ボタン
+        chip_button = tk.Button(self.defect_info_frame, text="C/R", font=("Yu Gothic UI", 10), command=self.on_chip_button)
+        chip_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # 「異形」ボタン
+        other_button = tk.Button(self.defect_info_frame, text="異形", font=("Yu Gothic UI", 10), command=self.on_other_button)
+        other_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 修理済みボタン
-        repair_button = tk.Button(self.defect_info_frame, text="修理済み", font=("Yu Gothic UI", 10), command=self.repair_defect)
-        repair_button.pack(side=tk.LEFT, padx=10)
+        repair_button = tk.Button(self.defect_info_frame, text="修理済み", font=("Yu Gothic UI", 10), command=self.on_repaired)
+        repair_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 基板操作フレーム
         board_control_frame = tk.LabelFrame(self.info_frame, text="基板切替", font=("Yu Gothic UI", 10))
@@ -236,11 +259,11 @@ class RepairView(tk.Toplevel):
     
     def create_defect_list_widgets(self):
         self.defect_list_frame = tk.Frame(self.widgets_frame)
-        self.defect_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.defect_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, pady=10)
         # Treeviewの作成
-        columns = ("No", "RF", "不良項目", "修理")
+        columns = ("No", "RF", "不良項目", "分類", "修理")
         self.defect_listbox = ttk.Treeview(self.defect_list_frame, columns=columns, show="headings")
-        col_widths = {"No": 10, "RF": 30, "不良項目": 90, "修理": 10}
+        col_widths = {"No": 10, "RF": 30, "不良項目": 90, "分類": 15, "修理": 15}
         for col in columns:
             self.defect_listbox.heading(col, text=col)
             self.defect_listbox.column(col, width=col_widths[col], anchor="center")
@@ -292,11 +315,11 @@ class RepairView(tk.Toplevel):
             # 選択中のアイテムの値を取得
             item_values = self.defect_listbox.item(selected_item[0], "values")
             self.no_value.config(text=item_values[0])   # No列を表示
-            self.rf_label_value.config(text=item_values[1]) # RFラベルに値を設定
-            self.defect_label_value.config(text=item_values[2]) # 不良項目ラベルに値を設定
+            self.rf_entry.config(text=item_values[1])     # RFエントリに値を設定
+            self.defect_entry.config(text=item_values[2])     # 不良項目エントリに値を設定
             index = int(item_values[0]) - 1 # Noは1始まりなので-1してインデックスに変換
             defect_item = self.defect_list[index]   # defect_listから選択中のアイテムを取得
-            x, y = defect_item[4], defect_item[5]   # X, Y座標を取得
+            x, y = defect_item.x, defect_item.y   # X, Y座標を取得
             
             # canvasに座標マーカーを表示
             if x is not None and y is not None:
@@ -304,16 +327,17 @@ class RepairView(tk.Toplevel):
                 # 既存の座標マーカーを削除
                 self.canvas.delete("coordinate_marker")
                 # 新しい座標マーカーを追加
-                self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="red", tags="coordinate_marker")
+                self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
     
     def defect_number_update(self):
-        filter_defect_list = [d for d in self.defect_list if d[0] == self.current_board_index]
+        filter_defect_list = [d for d in self.defect_list if d.current_board_index == self.current_board_index]
         max_len = len(filter_defect_list)
         self.no_value.config(text=str(max_len + 1))
 
-    def defect_list_insert(self, item: tuple):
+    def defect_list_insert(self, item: DefectInfo):
         self.defect_list.append(item)
-        self.defect_listbox.insert("", "end", values=[item[1], item[2], item[3]])
+        print(item)
+        self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""])
         self.defect_number_update()
         print("[DEBUG] Current Defect List:")
         for item in self.defect_list:
@@ -334,12 +358,11 @@ class RepairView(tk.Toplevel):
         """ CSVファイルから不良リストを読み込み、defect_listに設定 """
         try:
             df = DataFrame(pd.read_csv(filepath))
-            self.defect_list = [tuple(row) for row in df.itertuples(index=False, name=None)]
+            self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
             self.update_defect_listbox()
-            messagebox.showinfo("Info", f"不良リストを {filepath} から読み込みました。")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
-    
+        
     def defect_listbox_no_reset(self):
         # self.defect_listboxのNo列を再設定
         for idx, item in enumerate(self.defect_listbox.get_children(), start=1):
@@ -366,20 +389,20 @@ class RepairView(tk.Toplevel):
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
         # 新しい座標マーカーを追加
-        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill="red", tags="coordinate_marker")
+        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
         
     def update_defect_listbox(self):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
-            if self.current_board_index == item[0]:
-                self.defect_listbox.insert("", "end", values=[item[1], item[2], item[3]])
+            if self.current_board_index == item.current_board_index:
+                self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""], tags=item.unique_id)
         self.defect_number_update()
     
     def update_index(self):
         items = self.defect_list
         # itemsから1つ目の要素をlistで取得
-        indices = [item[0] for item in items if isinstance(item[0], int)]
+        indices = [item.current_board_index for item in items if isinstance(item.current_board_index, int)]
         self.total_boards = max(indices) if indices else 1
         self.current_board_index = 1
 
@@ -394,6 +417,9 @@ class RepairView(tk.Toplevel):
             messagebox.showinfo("Info", "これ以上前の基板はありません。")
 
     def next_board(self):
+        if self.current_board_index == self.total_boards:
+            messagebox.showinfo("Info", "これ以上次の基板はありません。")
+            return
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         # 不良リストをCSVに保存
@@ -409,8 +435,7 @@ class RepairView(tk.Toplevel):
     def defect_list_to_csv(self):
         """ defect_listをCSVファイルに保存 """
         try:
-            columns = ["board_index", "No", "RF", "不良項目", "X", "Y", "日付", "シリアルNo", "AOI担当", "Y番", "機種名", "ロット番号"]
-            df = DataFrame(self.defect_list, columns=columns)
+            df = DataFrame([asdict(item) for item in self.defect_list])
             basename = self.create_csv_filename()
             df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
         except Exception as e:
@@ -510,6 +535,19 @@ class RepairView(tk.Toplevel):
             board_name = parts[2] if len(parts) > 2 else ""
             side_label = parts[3] if len(parts) > 3 else ""
 
+        # 指図に対応するCSVファイルのパスを取得
+        try:
+            csv_path = self.read_csv_path()
+        except FileNotFoundError:
+            self.current_item_code = None
+            self.current_lot_number = None
+            self.current_image_path = None
+            self.current_image_filename = None
+            self.canvas.delete("all")
+            self.defect_list = []
+            messagebox.showwarning("Warning", "指定された品目コードと指図に対応するCSVファイルが見つかりません。")
+            return
+
         # 各ラベルを更新
         self.model_label_value.config(text=model_name)
         self.board_label_value.config(text=board_name)
@@ -526,6 +564,7 @@ class RepairView(tk.Toplevel):
                 self.update_index()
                 self.update_board_label()
                 self.defect_number_update()
+                self.aoi_user_label_value.config(text=self.defect_list[0].aoi_user)
         except FileNotFoundError as e:
             # 不良リストを初期化
             self.defect_list = []
@@ -534,11 +573,17 @@ class RepairView(tk.Toplevel):
             self.update_board_label()
             self.defect_number_update()
 
-        if self.current_lot_number and self.current_item_code:
-            messagebox.showinfo("Info", f"新しい品目コード: {self.current_item_code}, 指図: {self.current_lot_number} に変更されました。")
-        else:
+        if not (self.current_lot_number and self.current_item_code):
             messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
             return
+    
+    def create_repaird_list(self):
+        if len(self.defect_list) == 0:
+            raise ValueError("Defect list is empty.")
+        for defect in self.defect_list:
+            self.repaird_list.append(RepairdInfo(
+                id=defect.unique_id,
+            ))
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
         """ 指図名のバリデーション """
@@ -614,17 +659,44 @@ class RepairView(tk.Toplevel):
         df['no'] = df['no'].apply(lambda x: int(x) if isinstance(x, float) and x.is_integer() else x)
         mapping_text = "\n".join([f"{row['no']}: {row['name']}" for _, row in df.iterrows()])
         messagebox.showinfo("不良名一覧", mapping_text)
-    
-    def repair_defect(self):
-        """ 選択中の項目の修理・未修理を切り替える """
+
+    def on_repaired(self):
+        """ 修理済みボタンが押されたときの処理 """
         selected_item = self.defect_listbox.selection()
         if not selected_item:
-            messagebox.showwarning("Warning", "修理する不良項目を選択してください。")
+            messagebox.showwarning("Warning", "修理済みにする不良項目を選択してください。")
             return
         item_values = self.defect_listbox.item(selected_item[0], "values")
-        print(f"[DEBUG] Selected item values: {item_values}")
-        # item_valuesに値を追加
+        item_tags = self.defect_listbox.item(selected_item[0], "tags")
+        repaird = item_values[4]
+        if repaird == "":
+            repaird = "済"
+        elif repaird == "済":
+            repaird = ""
+        # Treeviewの選択中のアイテムの修理列を更新
+        self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], item_values[3], repaird))
         
+    def on_chip_button(self):
+        """ C/Rボタンが押されたときの処理 """
+        selected_item = self.defect_listbox.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "C/Rにする不良項目を選択してください。")
+            return
+        item_values = self.defect_listbox.item(selected_item[0], "values")
+        self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], "C/R", item_values[4]))
+        # 分類ラベルを更新
+        self.parts_type_entry.config(text="C/R")
+
+    def on_other_button(self):
+        """ 異形ボタンが押されたときの処理 """
+        selected_item = self.defect_listbox.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "異形にする不良項目を選択してください。")
+            return
+        item_values = self.defect_listbox.item(selected_item[0], "values")
+        self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], "異形", item_values[4]))
+        # 分類ラベルを更新
+        self.parts_type_entry.config(text="異形")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
