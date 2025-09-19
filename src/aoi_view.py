@@ -14,6 +14,7 @@ import re
 from dataclasses import asdict
 from typing import List
 from .defect_info import DefectInfo
+from .utils import Utils
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -503,8 +504,7 @@ class AOIView(tk.Toplevel):
         """ defect_listをCSVファイルに保存 """
         try:
             df = DataFrame([asdict(item) for item in self.defect_list])
-            basename = self.create_csv_filename()
-            df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
+            df.to_csv(self.read_csv_path(), index=False, encoding="utf-8-sig")
         except OSError as e:
             raise OSError(e)
         except Exception as e:

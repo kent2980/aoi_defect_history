@@ -15,6 +15,7 @@ from dataclasses import asdict
 from typing import List
 from .defect_info import DefectInfo
 from .repaird_info import RepairdInfo
+from .utils import Utils
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -361,8 +362,8 @@ class RepairView(tk.Toplevel):
             df = DataFrame(pd.read_csv(filepath))
             self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
             # 修理データ取得処理
-            if os.path.exists(self.create_repaird_csv_path()):
-                repaird_df = DataFrame(pd.read_csv(self.create_repaird_csv_path()))
+            if os.path.exists(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)):
+                repaird_df = DataFrame(pd.read_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)))
                 self.repaird_list = [RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")]
             else:
                 self.repaird_list = []
@@ -471,15 +472,6 @@ class RepairView(tk.Toplevel):
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         return f"{self.current_lot_number}_{self.current_image_filename}.csv"
-
-    def create_repaird_csv_path(self):
-        """ 指図に対応する修理データCSVファイル名を生成"""
-        if not self.current_lot_number:
-            raise ValueError("Current lot number is not set.")
-        if not self.data_directory:
-            raise ValueError("Not Setting Data Directory")
-        filename = f"{self.current_lot_number}_repaird_list.csv"
-        return os.path.join(self.data_directory, filename)
 
     def read_csv_path(self):
         """ 指図に対応するCSVファイルのパスを取得 """
@@ -727,7 +719,7 @@ class RepairView(tk.Toplevel):
                 r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 break
         df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
+        df.to_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number), index=False, encoding="utf-8-sig")
 
     def on_chip_button(self):
         """ C/Rボタンが押されたときの処理 """
@@ -748,7 +740,7 @@ class RepairView(tk.Toplevel):
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
+        df.to_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number), index=False, encoding="utf-8-sig")
 
     def on_other_button(self):
         """ 異形ボタンが押されたときの処理 """
@@ -769,7 +761,7 @@ class RepairView(tk.Toplevel):
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
+        df.to_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number), index=False, encoding="utf-8-sig")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
