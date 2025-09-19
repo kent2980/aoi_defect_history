@@ -13,8 +13,11 @@ import pandas as pd
 import re
 from dataclasses import asdict
 from typing import List
+
+from src.repaird_info import RepairdInfo
 from .defect_info import DefectInfo
 from .utils import Utils
+from pathlib import Path
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -53,6 +56,7 @@ class AOIView(tk.Toplevel):
         
         # 不具合リスト
         self.defect_list:List[DefectInfo] = []
+        self.repaird_list:List[RepairdInfo] = []
         
         # 基板番号
         self.current_board_index = 1
@@ -342,10 +346,21 @@ class AOIView(tk.Toplevel):
     def read_defect_list_csv(self, filepath: str):
         """ CSVファイルから不良リストを読み込み、defect_listに設定 """
         try:
-            df = DataFrame(pd.read_csv(filepath))
-            self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
+            # 不良データ取得処理
+            if Path(filepath).exists():
+                df = DataFrame(pd.read_csv(filepath))
+                self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
+            else:
+                self.defect_list = []
+            # 修理データ取得処理
+            if os.path.exists(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)):
+                repaird_df = DataFrame(pd.read_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)))
+                self.repaird_list = [RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")]
+            else:
+                self.repaird_list = []
             self.update_defect_listbox()
         except Exception as e:
+            raise Exception(e)
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
     def save_defect_info(self):
@@ -454,8 +469,15 @@ class AOIView(tk.Toplevel):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
+            unique_id = item.unique_id
+            find_repaird = [r for r in self.repaird_list if r.id == unique_id]
             if self.current_board_index == item.current_board_index:
-                self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
+                if len(find_repaird) > 0:
+                    repaird_item = find_repaird[0]
+                    repaird_str = "済" if repaird_item.is_repaird == True else ""
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, repaird_str])
+                else:
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
         self.defect_number_update()
     
     def update_index(self):
@@ -504,7 +526,8 @@ class AOIView(tk.Toplevel):
         """ defect_listをCSVファイルに保存 """
         try:
             df = DataFrame([asdict(item) for item in self.defect_list])
-            df.to_csv(self.read_csv_path(), index=False, encoding="utf-8-sig")
+            file_path = self.read_csv_path()
+            df.to_csv(file_path, index=False, encoding="utf-8-sig")
         except OSError as e:
             raise OSError(e)
         except Exception as e:
@@ -526,10 +549,8 @@ class AOIView(tk.Toplevel):
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         csv_filename = self.create_csv_filename()
-        csv_path = os.path.join(self.data_directory, csv_filename)
-        if not os.path.exists(csv_path):
-            raise FileNotFoundError(f"CSV file not found: {csv_path}")
-        return csv_path
+        csv_path = Path.joinpath(Path(self.data_directory), csv_filename)
+        return csv_path.as_posix()
 
     def open_settings(self):
         """ 設定ダイアログを開く """
@@ -630,6 +651,7 @@ class AOIView(tk.Toplevel):
         except FileNotFoundError as e:
             # 不良リストを初期化
             self.defect_list = []
+            self.repaird_list = []
             self.update_defect_listbox()
             self.update_index()
             self.update_board_label()
