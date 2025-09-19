@@ -327,12 +327,8 @@ class AOIView(tk.Toplevel):
 
     def defect_list_insert(self, item: DefectInfo):
         self.defect_list.append(item)
-        print(item)
         self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
         self.defect_number_update()
-        print("[DEBUG] Current Defect List:")
-        for item in self.defect_list:
-            print(item)
 
     def defect_list_delete(self, index, tree_index: str):
         del self.defect_list[index]
@@ -341,9 +337,6 @@ class AOIView(tk.Toplevel):
         self.defect_number_update()
         # canvasの座標マーカーを削除
         self.canvas.delete("coordinate_marker")
-        print("[DEBUG] Current Defect List after deletion:")
-        for item in self.defect_list:
-            print(item)
     
     def read_defect_list_csv(self, filepath: str):
         """ CSVファイルから不良リストを読み込み、defect_listに設定 """
@@ -356,6 +349,12 @@ class AOIView(tk.Toplevel):
 
     def save_defect_info(self):
         """ 不良情報をdefect_listに追加し、defect_listboxを更新 """
+
+        # データディレクトリが有効か確認
+        if not self.exist_data_directory():
+            messagebox.showerror("Error", "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください。")
+            return
+
         # 不良番号を不良名に変換
         self.convert_defect_name()
         # 各種情報を取得
@@ -407,7 +406,7 @@ class AOIView(tk.Toplevel):
 
         # self.defect_listをCSVに保存
         self.defect_list_to_csv()
-        
+            
     def delete_defect_info(self):
         selected_item = self.defect_listbox.selection()
         if selected_item: 
@@ -476,8 +475,14 @@ class AOIView(tk.Toplevel):
             messagebox.showinfo("Info", "これ以上前の基板はありません。")
 
     def next_board(self):
+        """ 次の基板へ切り替え処理 """
+        # 現在の指図に対応するCSVファイルを読み込み
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
+        # データディレクトリが有効か確認
+        if not self.exist_data_directory():
+            messagebox.showerror("Error", "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください")
+            return
         # 不良リストをCSVに保存
         self.defect_list_to_csv()
         # 画面を更新
@@ -488,12 +493,20 @@ class AOIView(tk.Toplevel):
         self.update_defect_listbox()
         self.defect_number_update()
     
+    def exist_data_directory(self):
+        """ データディレクトリが存在するか確認 """
+        if not self.data_directory or not os.path.exists(self.data_directory):
+            return False
+        return True
+    
     def defect_list_to_csv(self):
         """ defect_listをCSVファイルに保存 """
         try:
             df = DataFrame([asdict(item) for item in self.defect_list])
             basename = self.create_csv_filename()
             df.to_csv(os.path.join(self.data_directory, basename), index=False, encoding="utf-8-sig")
+        except OSError as e:
+            raise OSError(e)
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save defect list to CSV:\n{e}")
 
@@ -523,7 +536,6 @@ class AOIView(tk.Toplevel):
         dialog = SettingsDialog(self)
         new_settings = dialog.result
         project_dir = PROJECT_DIR
-        print(f"[DEBUG] Project Directory: {project_dir}")
         if new_settings:
             # 新しい設定を適用
             self.image_directory = new_settings[0]
@@ -537,6 +549,14 @@ class AOIView(tk.Toplevel):
                     'image_directory': new_settings[0],
                     'data_directory': new_settings[1]
                 }
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
+            else:
+                # 既存の設定ファイルを更新
+                config = configparser.ConfigParser()
+                config.read(settings_path, encoding="utf-8")
+                config['DIRECTORIES']['image_directory'] = new_settings[0]
+                config['DIRECTORIES']['data_directory'] = new_settings[1]
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
             
@@ -667,7 +687,6 @@ class AOIView(tk.Toplevel):
             return
         # defect_numberがintに変換できない場合は例外をスロー
         if not defect_number.isdigit():
-            print(f"[DEBUG] Defect number '{defect_number}' is not a valid integer.")
             return
         defect_number = int(defect_number)
         # defect_mapping.csvをDataFrameで読み込み

@@ -12,3 +12,4 @@ class RepairdInfo:
     id: str 
     is_repaird: bool = False
     parts_type: str = ""
+    insert_date: str = ""

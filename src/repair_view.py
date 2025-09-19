@@ -357,12 +357,20 @@ class RepairView(tk.Toplevel):
     def read_defect_list_csv(self, filepath: str):
         """ CSVファイルから不良リストを読み込み、defect_listに設定 """
         try:
+            # 不良データ取得処理
             df = DataFrame(pd.read_csv(filepath))
             self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
+            # 修理データ取得処理
+            if os.path.exists(self.create_repaird_csv_path()):
+                repaird_df = DataFrame(pd.read_csv(self.create_repaird_csv_path()))
+                self.repaird_list = [RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")]
+            else:
+                self.repaird_list = []
             self.update_defect_listbox()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
-        
+            raise Exception(e)
+
     def defect_listbox_no_reset(self):
         # self.defect_listboxのNo列を再設定
         for idx, item in enumerate(self.defect_listbox.get_children(), start=1):
@@ -395,8 +403,16 @@ class RepairView(tk.Toplevel):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
+            unique_id = item.unique_id
+            find_repaird = [r for r in self.repaird_list if r.id == unique_id]
             if self.current_board_index == item.current_board_index:
-                self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""], tags=item.unique_id)
+                if len(find_repaird) > 0:
+                    repaird_item = find_repaird[0]
+                    repaird_str = "済" if repaird_item.is_repaird == True else ""
+                    parts_type = repaird_item.parts_type if repaird_item.parts_type in ["C/R", "異形"] else ""
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, parts_type, repaird_str], tags=item.unique_id)
+                else:
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""], tags=item.unique_id)
         self.defect_number_update()
     
     def update_index(self):
@@ -422,8 +438,6 @@ class RepairView(tk.Toplevel):
             return
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
-        # 不良リストをCSVに保存
-        self.defect_list_to_csv()
         # 画面を更新
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
@@ -431,6 +445,12 @@ class RepairView(tk.Toplevel):
         # treeviewを初期化
         self.update_defect_listbox()
         self.defect_number_update()
+    
+    def exist_data_directory(self):
+        """ データディレクトリが存在するか確認 """
+        if not self.data_directory or not os.path.exists(self.data_directory):
+            return False
+        return True
     
     def defect_list_to_csv(self):
         """ defect_listをCSVファイルに保存 """
@@ -451,6 +471,15 @@ class RepairView(tk.Toplevel):
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         return f"{self.current_lot_number}_{self.current_image_filename}.csv"
+
+    def create_repaird_csv_path(self):
+        """ 指図に対応する修理データCSVファイル名を生成"""
+        if not self.current_lot_number:
+            raise ValueError("Current lot number is not set.")
+        if not self.data_directory:
+            raise ValueError("Not Setting Data Directory")
+        filename = f"{self.current_lot_number}_repaird_list.csv"
+        return os.path.join(self.data_directory, filename)
 
     def read_csv_path(self):
         """ 指図に対応するCSVファイルのパスを取得 """
@@ -483,6 +512,14 @@ class RepairView(tk.Toplevel):
                 }
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
+            else:
+                # 既存の設定ファイルを更新
+                config = configparser.ConfigParser()
+                config.read(settings_path, encoding="utf-8")
+                config['DIRECTORIES']['image_directory'] = new_settings[0]
+                config['DIRECTORIES']['data_directory'] = new_settings[1]
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
             
             messagebox.showinfo("Info", f"新しい設定: {new_settings[0]}, {new_settings[1]} に変更されました。")
         else:
@@ -510,6 +547,10 @@ class RepairView(tk.Toplevel):
             self.current_item_code = None
             self.current_lot_number = None
             return
+
+        # リストの初期化
+        self.defect_list = []
+        self.repaird_list = []
 
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
         if self.image_directory and self.current_item_code:
@@ -565,9 +606,11 @@ class RepairView(tk.Toplevel):
                 self.update_board_label()
                 self.defect_number_update()
                 self.aoi_user_label_value.config(text=self.defect_list[0].aoi_user)
+                self.create_repaird_list()
         except FileNotFoundError as e:
             # 不良リストを初期化
             self.defect_list = []
+            self.repaird_list = []
             self.update_defect_listbox()
             self.update_index()
             self.update_board_label()
@@ -580,10 +623,12 @@ class RepairView(tk.Toplevel):
     def create_repaird_list(self):
         if len(self.defect_list) == 0:
             raise ValueError("Defect list is empty.")
+        repaird_list_ids = [item.id for item in self.repaird_list]
         for defect in self.defect_list:
-            self.repaird_list.append(RepairdInfo(
-                id=defect.unique_id,
-            ))
+            if defect.unique_id not in repaird_list_ids:
+                self.repaird_list.append(RepairdInfo(
+                    id=defect.unique_id,
+                ))
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
         """ 指図名のバリデーション """
@@ -675,7 +720,15 @@ class RepairView(tk.Toplevel):
             repaird = ""
         # Treeviewの選択中のアイテムの修理列を更新
         self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], item_values[3], repaird))
-        
+        # repaird_listを更新)
+        for r in self.repaird_list:
+            if r.id == item_tags[0]:
+                r.is_repaird = repaird == "済"
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                break
+        df = DataFrame([asdict(r) for r in self.repaird_list])
+        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
+
     def on_chip_button(self):
         """ C/Rボタンが押されたときの処理 """
         selected_item = self.defect_listbox.selection()
@@ -683,9 +736,19 @@ class RepairView(tk.Toplevel):
             messagebox.showwarning("Warning", "C/Rにする不良項目を選択してください。")
             return
         item_values = self.defect_listbox.item(selected_item[0], "values")
+        item_tags = self.defect_listbox.item(selected_item[0], "tags")
         self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], "C/R", item_values[4]))
         # 分類ラベルを更新
         self.parts_type_entry.config(text="C/R")
+        # repaird_listを更新
+        for r in self.repaird_list:
+            if r.id == item_tags[0]:
+                r.parts_type = "C/R"
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                break
+        # repaird_listをCSVに保存
+        df = DataFrame([asdict(r) for r in self.repaird_list])
+        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
 
     def on_other_button(self):
         """ 異形ボタンが押されたときの処理 """
@@ -694,9 +757,19 @@ class RepairView(tk.Toplevel):
             messagebox.showwarning("Warning", "異形にする不良項目を選択してください。")
             return
         item_values = self.defect_listbox.item(selected_item[0], "values")
+        item_tags = self.defect_listbox.item(selected_item[0], "tags")
         self.defect_listbox.item(selected_item[0], values=(item_values[0], item_values[1], item_values[2], "異形", item_values[4]))
         # 分類ラベルを更新
         self.parts_type_entry.config(text="異形")
+        # repaird_listを更新
+        for r in self.repaird_list:
+            if r.id == item_tags[0]:
+                r.parts_type = "異形"
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                break
+        # repaird_listをCSVに保存
+        df = DataFrame([asdict(r) for r in self.repaird_list])
+        df.to_csv(self.create_repaird_csv_path(), index=False, encoding="utf-8-sig")
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
