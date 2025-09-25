@@ -5,7 +5,7 @@ from tkinter import simpledialog
 from tkinter import ttk
 from PIL import Image, ImageTk
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pandas import DataFrame
 from pathlib import Path
 import configparser
@@ -18,20 +18,25 @@ from src.repaird_info import RepairdInfo
 from .defect_info import DefectInfo
 from .utils import Utils
 from pathlib import Path
+import requests
+import json
 
 PROJECT_DIR = Path(__file__).parent.parent
 
 
 class AOIView(tk.Toplevel):
-    def __init__(self, fillColor = "white", master=None):
+    def __init__(self, fillColor="white", master=None):
         super().__init__(master)
         self.title("AOI 製品経歴書")
         # 最大化表示
         self.option_add("*Background", "white")
         self.option_add("*Entry.Background", "white")
         self.option_add("*Label.Background", "white")
-        self.state('zoomed')
+        self.state("zoomed")
         self.configure(bg="white")
+
+        # 閉じるボタン押下時の処理
+        self.protocol("WM_DELETE_WINDOW", self.before_close)
 
         # 座標の塗りつぶし色
         self.fillColor = fillColor
@@ -53,11 +58,11 @@ class AOIView(tk.Toplevel):
 
         # 現在の座標情報
         self.current_coordinates = None
-        
+
         # 不具合リスト
-        self.defect_list:List[DefectInfo] = []
-        self.repaird_list:List[RepairdInfo] = []
-        
+        self.defect_list: List[DefectInfo] = []
+        self.repaird_list: List[RepairdInfo] = []
+
         # 基板番号
         self.current_board_index = 1
         self.total_boards = 1
@@ -83,8 +88,8 @@ class AOIView(tk.Toplevel):
             config = configparser.ConfigParser()
             config.read(settings_path, encoding="utf-8")
             # 例: 画像ディレクトリとデータディレクトリを取得
-            self.image_directory = config['DIRECTORIES'].get('image_directory', '')
-            self.data_directory = config['DIRECTORIES'].get('data_directory', '')
+            self.image_directory = config["DIRECTORIES"].get("image_directory", "")
+            self.data_directory = config["DIRECTORIES"].get("data_directory", "")
 
     def create_menu(self):
         menubar = tk.Menu(self)
@@ -98,19 +103,25 @@ class AOIView(tk.Toplevel):
         help_menu.add_command(label="不良名一覧", command=self.show_defect_mapping)
         menubar.add_cascade(label="ヘルプ", menu=help_menu)
         self.config(menu=menubar)
-    
+
     def create_header(self):
         # ヘッダーフレーム
         header_frame = tk.Frame(self, height=50)
-        header_frame.pack(fill=tk.X,pady=10)
-        
+        header_frame.pack(fill=tk.X, pady=10)
+
         # フォント（Yu Gothic UI, Meiryo, Segoe UI）
         font_title = ("Yu Gothic UI", 16, "bold")
         font_label = ("Yu Gothic UI", 10)
         font_value = ("Yu Gothic UI", 10)
-        
+
         # タイトルラベル
-        title_label = tk.Label(header_frame, text="AOI 製品経歴書", font=font_title, relief="solid", borderwidth=1)
+        title_label = tk.Label(
+            header_frame,
+            text="AOI 製品経歴書",
+            font=font_title,
+            relief="solid",
+            borderwidth=1,
+        )
         title_label.pack(side=tk.LEFT, padx=10, pady=10, ipadx=15)
 
         # シリアルエントリ
@@ -125,120 +136,177 @@ class AOIView(tk.Toplevel):
 
         # インフォフレーム
         info_frame = tk.Frame(right_frame)
-        info_frame.pack(fill=tk.X,padx=10)
-        
+        info_frame.pack(fill=tk.X, padx=10)
+
         # 下線のみ追加
         underline = tk.Frame(info_frame, bg="black", height=1)
         underline.pack(fill=tk.X, side=tk.BOTTOM)
-        
+
         # ロット切り替えボタン
-        lot_change_button = tk.Button(info_frame, text="指図切替", font=("Yu Gothic UI", 8), command=self.change_lot)
-        lot_change_button.pack(side=tk.LEFT, padx=5, pady=[0,2])
-        
+        lot_change_button = tk.Button(
+            info_frame,
+            text="指図切替",
+            font=("Yu Gothic UI", 8),
+            command=self.change_lot,
+        )
+        lot_change_button.pack(side=tk.LEFT, padx=5, pady=[0, 2])
+
         # 機種名
         model_label = tk.Label(info_frame, text="機種名: ", font=font_label)
         model_label.pack(side=tk.LEFT, padx=10)
-        self.model_label_value = tk.Label(info_frame,width=30, font=font_value, anchor="w")
+        self.model_label_value = tk.Label(
+            info_frame, width=30, font=font_value, anchor="w"
+        )
         self.model_label_value.pack(side=tk.LEFT)
-        
+
         # 基板名
         board_label = tk.Label(info_frame, text="基板名: ", font=font_label)
         board_label.pack(side=tk.LEFT, padx=10)
-        self.board_label_value = tk.Label(info_frame, width=15, font=font_value, anchor="w")
+        self.board_label_value = tk.Label(
+            info_frame, width=15, font=font_value, anchor="w"
+        )
         self.board_label_value.pack(side=tk.LEFT)
 
         # 面
         side_label = tk.Label(info_frame, text="面: ", font=font_label)
         side_label.pack(side=tk.LEFT, padx=10)
-        self.side_label_value = tk.Label(info_frame, width=5, font=font_value, anchor="w")
+        self.side_label_value = tk.Label(
+            info_frame, width=5, font=font_value, anchor="w"
+        )
         self.side_label_value.pack(side=tk.LEFT)
-        
+
         # 指図
         lot_label = tk.Label(info_frame, text="指図: ", font=font_label)
         lot_label.pack(side=tk.LEFT, padx=10)
-        self.lot_label_value = tk.Label(info_frame, width=12, font=font_value, anchor="w")
+        self.lot_label_value = tk.Label(
+            info_frame, width=12, font=font_value, anchor="w"
+        )
         self.lot_label_value.pack(side=tk.LEFT)
 
         # ユーザーフレーム
         user_frame = tk.Frame(right_frame)
-        user_frame.pack(fill=tk.X,padx=10)
+        user_frame.pack(fill=tk.X, padx=10)
 
         # 下線のみ追加
         underline_user = tk.Frame(user_frame, bg="black", height=1)
         underline_user.pack(fill=tk.X, side=tk.BOTTOM)
 
         # ユーザー切り替えボタン
-        user_change_button = tk.Button(user_frame, text="ユーザー切替", font=("Yu Gothic UI", 8), command=self.change_user)
-        user_change_button.pack(side=tk.LEFT, padx=5, pady=[0,2])
+        user_change_button = tk.Button(
+            user_frame,
+            text="ユーザー切替",
+            font=("Yu Gothic UI", 8),
+            command=self.change_user,
+        )
+        user_change_button.pack(side=tk.LEFT, padx=5, pady=[0, 2])
 
         # AOI担当
         aoi_user_label = tk.Label(user_frame, text="AOI担当: ", font=font_label)
         aoi_user_label.pack(side=tk.LEFT, padx=10)
-        self.aoi_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.aoi_user_label_value = tk.Label(
+            user_frame, font=font_value, anchor="w", width=10
+        )
         self.aoi_user_label_value.pack(side=tk.LEFT)
 
         # 修理担当
         repair_user_label = tk.Label(user_frame, text="修理担当: ", font=font_label)
         repair_user_label.pack(side=tk.LEFT, padx=10)
-        self.repair_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.repair_user_label_value = tk.Label(
+            user_frame, font=font_value, anchor="w", width=10
+        )
         self.repair_user_label_value.pack(side=tk.LEFT)
 
         # 目視担当
         inspect_user_label = tk.Label(user_frame, text="目視担当: ", font=font_label)
         inspect_user_label.pack(side=tk.LEFT, padx=10)
-        self.inspect_user_label_value = tk.Label(user_frame, font=font_value, anchor="w", width=10)
+        self.inspect_user_label_value = tk.Label(
+            user_frame, font=font_value, anchor="w", width=10
+        )
         self.inspect_user_label_value.pack(side=tk.LEFT)
 
     def create_defect_info_area(self):
 
         self.info_frame = tk.Frame(self)
         self.info_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-         # 不良情報入力フレーム
-        self.defect_info_frame = tk.LabelFrame(self.info_frame, text="不良情報入力", font=("Yu Gothic UI", 10))
+
+        # 不良情報入力フレーム
+        self.defect_info_frame = tk.LabelFrame(
+            self.info_frame, text="不良情報入力", font=("Yu Gothic UI", 10)
+        )
         self.defect_info_frame.pack(side=tk.LEFT, padx=40)
 
         # 番号
-        no_label = tk.Label(self.defect_info_frame, text="No: ", font=("Yu Gothic UI", 12))
+        no_label = tk.Label(
+            self.defect_info_frame, text="No: ", font=("Yu Gothic UI", 12)
+        )
         no_label.pack(side=tk.LEFT, padx=10)
-        self.no_value = tk.Label(self.defect_info_frame, text="1", font=("Yu Gothic UI", 12), width=4)
+        self.no_value = tk.Label(
+            self.defect_info_frame, text="1", font=("Yu Gothic UI", 12), width=4
+        )
         self.no_value.pack(side=tk.LEFT, padx=10)
 
         # リファレンス
-        rf_label = tk.Label(self.defect_info_frame, text="リファレンス: ", font=("Yu Gothic UI", 12))
-        rf_label.pack(side=tk.LEFT, padx=10) 
+        rf_label = tk.Label(
+            self.defect_info_frame, text="リファレンス: ", font=("Yu Gothic UI", 12)
+        )
+        rf_label.pack(side=tk.LEFT, padx=10)
         self.rf_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
         self.rf_entry.pack(side=tk.LEFT, padx=10)
 
         # 不良項目
-        defect_label = tk.Label(self.defect_info_frame, text="不良項目: ", font=("Yu Gothic UI", 12))
+        defect_label = tk.Label(
+            self.defect_info_frame, text="不良項目: ", font=("Yu Gothic UI", 12)
+        )
         defect_label.pack(side=tk.LEFT, padx=10)
         self.defect_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
         self.defect_entry.pack(side=tk.LEFT, padx=10)
         self.defect_entry.bind("<Return>", lambda event: self.convert_defect_name())
 
         # 保存ボタン
-        save_button = tk.Button(self.defect_info_frame, text="保存", font=("Yu Gothic UI", 10), command=self.save_defect_info)
+        save_button = tk.Button(
+            self.defect_info_frame,
+            text="保存",
+            font=("Yu Gothic UI", 10),
+            command=self.save_defect_info,
+        )
         save_button.pack(side=tk.LEFT, padx=20, pady=5)
 
         # 削除ボタン
-        delete_button = tk.Button(self.defect_info_frame, text="削除", font=("Yu Gothic UI", 10), command=self.delete_defect_info)
+        delete_button = tk.Button(
+            self.defect_info_frame,
+            text="削除",
+            font=("Yu Gothic UI", 10),
+            command=self.delete_defect_info,
+        )
         delete_button.pack(side=tk.LEFT, padx=10, pady=5)
 
         # 基板操作フレーム
-        board_control_frame = tk.LabelFrame(self.info_frame, text="基板切替", font=("Yu Gothic UI", 10))
+        board_control_frame = tk.LabelFrame(
+            self.info_frame, text="基板切替", font=("Yu Gothic UI", 10)
+        )
         board_control_frame.pack(side=tk.RIGHT, padx=[0, 50])
-        
+
         # 基板Noラベル
-        self.board_no_label = tk.Label(board_control_frame, text="1 / 1 枚", font=("Yu Gothic UI", 12))
+        self.board_no_label = tk.Label(
+            board_control_frame, text="1 / 1 枚", font=("Yu Gothic UI", 12)
+        )
         self.board_no_label.pack(side=tk.LEFT, padx=[5, 5])
         # 前の基板ボタン
-        prev_board_button = tk.Button(board_control_frame, text="<< 前へ", font=("Yu Gothic UI", 10), command=self.prev_board)
-        prev_board_button.pack(side=tk.LEFT, padx=[10,5], pady=5)
-
+        prev_board_button = tk.Button(
+            board_control_frame,
+            text="<< 前へ",
+            font=("Yu Gothic UI", 10),
+            command=self.prev_board,
+        )
+        prev_board_button.pack(side=tk.LEFT, padx=[10, 5], pady=5)
 
         # 次の基板ボタン
-        next_board_button = tk.Button(board_control_frame, text="次へ >>", font=("Yu Gothic UI", 10), command=self.next_board)
+        next_board_button = tk.Button(
+            board_control_frame,
+            text="次へ >>",
+            font=("Yu Gothic UI", 10),
+            command=self.next_board,
+        )
         next_board_button.pack(side=tk.LEFT, padx=[5, 10], pady=5)
 
     def create_widgets_area(self):
@@ -246,34 +314,56 @@ class AOIView(tk.Toplevel):
         self.widgets_frame.pack(fill=tk.X, expand=True, padx=10)
 
     def create_canvas_widgets(self):
-        self.canvas = tk.Canvas(self.widgets_frame, bg="white",width=900, height=450)
+        self.canvas = tk.Canvas(self.widgets_frame, bg="white", width=900, height=450)
         self.canvas.pack(side=tk.LEFT, expand=True)
         # 左クリック処理をバインド
         self.canvas.bind("<Button-1>", self.on_canvas_click)
-    
+
     def create_defect_list_widgets(self):
         self.defect_list_frame = tk.Frame(self.widgets_frame)
-        self.defect_list_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.defect_list_frame.pack(
+            side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10
+        )
         # Treeviewの作成
         columns = ("No", "RF", "不良項目", "修理")
-        self.defect_listbox = ttk.Treeview(self.defect_list_frame, columns=columns, show="headings")
+        self.defect_listbox = ttk.Treeview(
+            self.defect_list_frame, columns=columns, show="headings"
+        )
         col_widths = {"No": 10, "RF": 30, "不良項目": 90, "修理": 10}
         for col in columns:
             self.defect_listbox.heading(col, text=col)
             self.defect_listbox.column(col, width=col_widths[col], anchor="center")
         # TreeviewとScrollbarをFrame内で横並びに配置
         self.defect_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar = ttk.Scrollbar(self.defect_list_frame, orient=tk.VERTICAL, command=self.defect_listbox.yview)
+        scrollbar = ttk.Scrollbar(
+            self.defect_list_frame,
+            orient=tk.VERTICAL,
+            command=self.defect_listbox.yview,
+        )
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.defect_listbox.configure(yscrollcommand=scrollbar.set)
         # Treeviewの選択イベントをバインド
         self.defect_listbox.bind("<<TreeviewSelect>>", self.on_defect_select)
 
+    def before_close(self):
+        """閉じる前の処理"""
+        if len(self.defect_list) > 0:
+            try:
+                self.post_kintone_record(self.defect_list)
+            except ValueError as e:
+                print(e)
+                messagebox.showerror("送信エラー", f"API送信エラー:{e}")
+            # defect_listをCSVに保存
+            self.defect_list_to_csv()
+        self.destroy()
 
     def open_image(self):
-        """ 画像を開くダイアログを表示し、選択された画像をcanvasに表示 """
+        """画像を開くダイアログを表示し、選択された画像をcanvasに表示"""
         filepath = filedialog.askopenfilename(
-            filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif"), ("All Files", "*.*")]
+            filetypes=[
+                ("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif"),
+                ("All Files", "*.*"),
+            ]
         )
         if not filepath:
             return
@@ -283,12 +373,17 @@ class AOIView(tk.Toplevel):
             image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
             self.photo_image = ImageTk.PhotoImage(image)
             self.canvas.delete("all")
-            self.canvas.create_image(self.canvas.winfo_width()//2, self.canvas.winfo_height()//2, image=self.photo_image, anchor="center")
+            self.canvas.create_image(
+                self.canvas.winfo_width() // 2,
+                self.canvas.winfo_height() // 2,
+                image=self.photo_image,
+                anchor="center",
+            )
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open image:\n{e}")
 
     def open_select_image(self, filepath: str):
-        """ 指定されたファイルパスの画像をcanvasに表示 """
+        """指定されたファイルパスの画像をcanvasに表示"""
         if not filepath:
             return
         try:
@@ -297,42 +392,62 @@ class AOIView(tk.Toplevel):
             image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
             self.photo_image = ImageTk.PhotoImage(image)
             self.canvas.delete("all")
-            self.canvas.create_image(self.canvas.winfo_width()//2, self.canvas.winfo_height()//2, image=self.photo_image, anchor="center")
+            self.canvas.create_image(
+                self.canvas.winfo_width() // 2,
+                self.canvas.winfo_height() // 2,
+                image=self.photo_image,
+                anchor="center",
+            )
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open image:\n{e}")
 
     def on_defect_select(self, event):
-        """ defect_listboxで選択されたアイテムの情報をエントリに表示し、canvasに座標マーカーを表示 """
+        """defect_listboxで選択されたアイテムの情報をエントリに表示し、canvasに座標マーカーを表示"""
         # 選択中のアイテムを取得
         selected_item = self.defect_listbox.selection()
         if selected_item:
             # 選択中のアイテムの値を取得
             item_values = self.defect_listbox.item(selected_item[0], "values")
-            self.no_value.config(text=item_values[0])   # No列を表示
-            self.rf_entry.delete(0, tk.END)             # RFエントリをクリア
-            self.rf_entry.insert(0, item_values[1])     # RFエントリに値を設定
-            self.defect_entry.delete(0, tk.END) # 不良項目エントリをクリア
-            self.defect_entry.insert(0, item_values[2]) # 不良項目エントリに値を設定
-            index = int(item_values[0]) - 1 # Noは1始まりなので-1してインデックスに変換
-            defect_item = self.defect_list[index]   # defect_listから選択中のアイテムを取得
-            x, y = defect_item.x, defect_item.y   # X, Y座標を取得
-            
+            self.no_value.config(text=item_values[0])  # No列を表示
+            self.rf_entry.delete(0, tk.END)  # RFエントリをクリア
+            self.rf_entry.insert(0, item_values[1])  # RFエントリに値を設定
+            self.defect_entry.delete(0, tk.END)  # 不良項目エントリをクリア
+            self.defect_entry.insert(0, item_values[2])  # 不良項目エントリに値を設定
+            index = int(item_values[0]) - 1  # Noは1始まりなので-1してインデックスに変換
+            defect_item = self.defect_list[
+                index
+            ]  # defect_listから選択中のアイテムを取得
+            x, y = defect_item.x, defect_item.y  # X, Y座標を取得
+
             # canvasに座標マーカーを表示
             if x is not None and y is not None:
                 r = 5
                 # 既存の座標マーカーを削除
                 self.canvas.delete("coordinate_marker")
                 # 新しい座標マーカーを追加
-                self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
-    
+                self.canvas.create_oval(
+                    x - r,
+                    y - r,
+                    x + r,
+                    y + r,
+                    fill=self.fillColor,
+                    tags="coordinate_marker",
+                )
+
     def defect_number_update(self):
-        filter_defect_list = [d for d in self.defect_list if d.current_board_index == self.current_board_index]
+        filter_defect_list = [
+            d
+            for d in self.defect_list
+            if d.current_board_index == self.current_board_index
+        ]
         max_len = len(filter_defect_list)
         self.no_value.config(text=str(max_len + 1))
 
     def defect_list_insert(self, item: DefectInfo):
         self.defect_list.append(item)
-        self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
+        self.defect_listbox.insert(
+            "", "end", values=[item.defect_number, item.reference, item.defect_name, ""]
+        )
         self.defect_number_update()
 
     def defect_list_delete(self, index, tree_index: str):
@@ -342,20 +457,34 @@ class AOIView(tk.Toplevel):
         self.defect_number_update()
         # canvasの座標マーカーを削除
         self.canvas.delete("coordinate_marker")
-    
+
     def read_defect_list_csv(self, filepath: str):
-        """ CSVファイルから不良リストを読み込み、defect_listに設定 """
+        """CSVファイルから不良リストを読み込み、defect_listに設定"""
         try:
             # 不良データ取得処理
             if Path(filepath).exists():
                 df = DataFrame(pd.read_csv(filepath))
-                self.defect_list = [DefectInfo(**row) for row in df.to_dict(orient="records")]
+                self.defect_list = [
+                    DefectInfo(**row) for row in df.to_dict(orient="records")
+                ]
             else:
                 self.defect_list = []
             # 修理データ取得処理
-            if os.path.exists(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)):
-                repaird_df = DataFrame(pd.read_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number)))
-                self.repaird_list = [RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")]
+            if os.path.exists(
+                Utils.create_repaird_csv_path(
+                    self.data_directory, self.current_lot_number
+                )
+            ):
+                repaird_df = DataFrame(
+                    pd.read_csv(
+                        Utils.create_repaird_csv_path(
+                            self.data_directory, self.current_lot_number
+                        )
+                    )
+                )
+                self.repaird_list = [
+                    RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")
+                ]
             else:
                 self.repaird_list = []
             self.update_defect_listbox()
@@ -364,25 +493,29 @@ class AOIView(tk.Toplevel):
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
     def save_defect_info(self):
-        """ 不良情報をdefect_listに追加し、defect_listboxを更新 """
+        """不良情報をdefect_listに追加し、defect_listboxを更新"""
 
         # データディレクトリが有効か確認
         if not self.exist_data_directory():
-            messagebox.showerror("Error", "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください。")
+            messagebox.showerror(
+                "Error",
+                "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください。",
+            )
             return
 
         # 不良番号を不良名に変換
         self.convert_defect_name()
         # 各種情報を取得
-        insert_date = datetime.now().strftime("%Y/%m/%d %H:%M:%S")  # 更新日時
+        insert_date = datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )  # 登録日時
         current_board_index = self.current_board_index  # 現在の基板番号
         defect_number = self.no_value.cget("text")  # 不良番号
-        rf = self.rf_entry.get().upper()    # リファレンス
-        defect_name = self.defect_entry.get()    # 不良項目
+        rf = self.rf_entry.get().upper()  # リファレンス
+        defect_name = self.defect_entry.get()  # 不良項目
         serial = self.serial_entry.get()  # シリアルNo
         aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
         model_code = self.current_item_code if self.current_item_code else ""
-        model_name = self.model_label_value.cget("text") if self.model_label_value.cget("text") else ""
         lot_number = self.current_lot_number if self.current_lot_number else ""
 
         # 座標を取得
@@ -395,7 +528,7 @@ class AOIView(tk.Toplevel):
         if x is None or y is None:
             messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
             return
-        
+
         # defect_listに追加
         defect = DefectInfo(
             current_board_index=current_board_index,
@@ -408,8 +541,7 @@ class AOIView(tk.Toplevel):
             serial=serial,
             aoi_user=aoi_user,
             model_code=model_code,
-            model_name=model_name,
-            lot_number=lot_number
+            lot_number=lot_number,
         )
         self.defect_list_insert(defect)
 
@@ -422,21 +554,23 @@ class AOIView(tk.Toplevel):
 
         # self.defect_listをCSVに保存
         self.defect_list_to_csv()
-            
+
     def delete_defect_info(self):
         selected_item = self.defect_listbox.selection()
-        if selected_item: 
+        if selected_item:
             # Treeview内の全アイテムIDリスト
             items = self.defect_listbox.get_children()
             # インデックス（0始まり）
             index = items.index(selected_item[0])
+            kintone_record_id = self.defect_list[index].kintone_record_id
+            self.delete_kintone_record(kintone_record_id)
             self.defect_list_delete(index, selected_item[0])
             self.rf_entry.delete(0, tk.END)
             self.defect_entry.delete(0, tk.END)
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
-    
+
     def defect_listbox_no_reset(self):
         # self.defect_listboxのNo列を再設定
         for idx, item in enumerate(self.defect_listbox.get_children(), start=1):
@@ -445,11 +579,11 @@ class AOIView(tk.Toplevel):
             self.defect_listbox.item(item, values=values)
         # self.defect_listのNo列を再設定
         for idx, item in enumerate(self.defect_list, start=1):
-            self.defect_list[idx - 1] = (str(idx),) + item[1:]
+            item.defect_number = str(idx)
 
     def on_canvas_click(self, event):
         # canvasに画像がない場合は何もしない
-        if not hasattr(self, 'photo_image'):
+        if not hasattr(self, "photo_image"):
             return
         # 不具合情報を初期化
         self.rf_entry.delete(0, tk.END)
@@ -463,27 +597,51 @@ class AOIView(tk.Toplevel):
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
         # 新しい座標マーカーを追加
-        self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker")
-        
+        self.canvas.create_oval(
+            x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker"
+        )
+
     def update_defect_listbox(self):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
-            unique_id = item.unique_id
-            find_repaird = [r for r in self.repaird_list if r.id == unique_id]
+            id = item.id
+            find_repaird = [r for r in self.repaird_list if r.id == id]
             if self.current_board_index == item.current_board_index:
                 if len(find_repaird) > 0:
                     repaird_item = find_repaird[0]
-                    repaird_str = "済" if repaird_item.is_repaird == True else ""
-                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, repaird_str])
+                    repaird_str = "済" if repaird_item.is_repaird == "修理済み" else ""
+                    self.defect_listbox.insert(
+                        "",
+                        "end",
+                        values=[
+                            item.defect_number,
+                            item.reference,
+                            item.defect_name,
+                            repaird_str,
+                        ],
+                    )
                 else:
-                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, ""])
+                    self.defect_listbox.insert(
+                        "",
+                        "end",
+                        values=[
+                            item.defect_number,
+                            item.reference,
+                            item.defect_name,
+                            "",
+                        ],
+                    )
         self.defect_number_update()
-    
+
     def update_index(self):
         items = self.defect_list
         # itemsから1つ目の要素をlistで取得
-        indices = [item.current_board_index for item in items if isinstance(item.current_board_index, int)]
+        indices = [
+            item.current_board_index
+            for item in items
+            if isinstance(item.current_board_index, int)
+        ]
         self.total_boards = max(indices) if indices else 1
         self.current_board_index = 1
 
@@ -498,13 +656,16 @@ class AOIView(tk.Toplevel):
             messagebox.showinfo("Info", "これ以上前の基板はありません。")
 
     def next_board(self):
-        """ 次の基板へ切り替え処理 """
+        """次の基板へ切り替え処理"""
         # 現在の指図に対応するCSVファイルを読み込み
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         # データディレクトリが有効か確認
         if not self.exist_data_directory():
-            messagebox.showerror("Error", "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください")
+            messagebox.showerror(
+                "Error",
+                "データディレクトリに接続できませんでした。ネットワークへの接続を確認してください",
+            )
             return
         # 不良リストをCSVに保存
         self.defect_list_to_csv()
@@ -515,15 +676,15 @@ class AOIView(tk.Toplevel):
         # treeviewを初期化
         self.update_defect_listbox()
         self.defect_number_update()
-    
+
     def exist_data_directory(self):
-        """ データディレクトリが存在するか確認 """
+        """データディレクトリが存在するか確認"""
         if not self.data_directory or not os.path.exists(self.data_directory):
             return False
         return True
-    
+
     def defect_list_to_csv(self):
-        """ defect_listをCSVファイルに保存 """
+        """defect_listをCSVファイルに保存"""
         try:
             df = DataFrame([asdict(item) for item in self.defect_list])
             file_path = self.read_csv_path()
@@ -534,10 +695,12 @@ class AOIView(tk.Toplevel):
             messagebox.showerror("Error", f"Failed to save defect list to CSV:\n{e}")
 
     def update_board_label(self):
-        self.board_no_label.config(text=f"{self.current_board_index} / {self.total_boards} 枚")
+        self.board_no_label.config(
+            text=f"{self.current_board_index} / {self.total_boards} 枚"
+        )
 
     def create_csv_filename(self):
-        """ 指図に対応するCSVファイル名を生成 """
+        """指図に対応するCSVファイル名を生成"""
         if not self.current_lot_number:
             raise ValueError("Current lot number is not set.")
         if not self.current_image_filename:
@@ -545,7 +708,7 @@ class AOIView(tk.Toplevel):
         return f"{self.current_lot_number}_{self.current_image_filename}.csv"
 
     def read_csv_path(self):
-        """ 指図に対応するCSVファイルのパスを取得 """
+        """指図に対応するCSVファイルのパスを取得"""
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
         csv_filename = self.create_csv_filename()
@@ -553,7 +716,7 @@ class AOIView(tk.Toplevel):
         return csv_path.as_posix()
 
     def open_settings(self):
-        """ 設定ダイアログを開く """
+        """設定ダイアログを開く"""
         dialog = SettingsDialog(self)
         new_settings = dialog.result
         project_dir = PROJECT_DIR
@@ -566,9 +729,9 @@ class AOIView(tk.Toplevel):
             if not settings_path.exists():
                 # 新しい設定を保存
                 config = configparser.ConfigParser()
-                config['DIRECTORIES'] = {
-                    'image_directory': new_settings[0],
-                    'data_directory': new_settings[1]
+                config["DIRECTORIES"] = {
+                    "image_directory": new_settings[0],
+                    "data_directory": new_settings[1],
                 }
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
@@ -576,29 +739,48 @@ class AOIView(tk.Toplevel):
                 # 既存の設定ファイルを更新
                 config = configparser.ConfigParser()
                 config.read(settings_path, encoding="utf-8")
-                config['DIRECTORIES']['image_directory'] = new_settings[0]
-                config['DIRECTORIES']['data_directory'] = new_settings[1]
+                config["DIRECTORIES"]["image_directory"] = new_settings[0]
+                config["DIRECTORIES"]["data_directory"] = new_settings[1]
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
-            
-            messagebox.showinfo("Info", f"新しい設定: {new_settings[0]}, {new_settings[1]} に変更されました。")
+
+            messagebox.showinfo(
+                "Info",
+                f"新しい設定: {new_settings[0]}, {new_settings[1]} に変更されました。",
+            )
         else:
             messagebox.showinfo("Info", "設定の変更がキャンセルされました。")
 
     def change_lot(self):
-        """ 品目コードと指図を変更するダイアログを開く """
+        """品目コードと指図を変更するダイアログを開く"""
 
         # ユーザーが未設定の場合は警告を表示して終了
         if not self.is_set_user():
-            messagebox.showwarning("Warning", "AOI担当が設定されていません。ユーザーを設定してください。")
+            messagebox.showwarning(
+                "Warning", "AOI担当が設定されていません。ユーザーを設定してください。"
+            )
             return
+
+        # API送信
+        if len(self.defect_list) > 0:
+            try:
+                self.post_kintone_record(self.defect_list)
+            except ValueError as e:
+                print(e)
+                messagebox.showerror("送信エラー", f"API送信エラー:{e}")
+
+        # defect_listをCSVに保存
+        if len(self.defect_list) > 0:
+            self.defect_list_to_csv()
 
         # 品目コードと指図を入力するダイアログを表示
         dialog = LotChangeDialog(self)
-        if not hasattr(dialog, 'result') or not dialog.result:
-            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+        if not hasattr(dialog, "result") or not dialog.result:
+            messagebox.showinfo(
+                "Info", "品目コードと指図の変更がキャンセルされました。"
+            )
             return
-            
+
         self.current_item_code = dialog.result[0].upper()
         self.current_lot_number = dialog.result[1]
 
@@ -612,7 +794,9 @@ class AOIView(tk.Toplevel):
         if self.image_directory and self.current_item_code:
             for filename in os.listdir(self.image_directory):
                 if filename.startswith(self.current_item_code):
-                    self.current_image_path = os.path.join(self.image_directory, filename)
+                    self.current_image_path = os.path.join(
+                        self.image_directory, filename
+                    )
                     self.open_select_image(self.current_image_path)
                     break
             # 画像が見つからなかった場合
@@ -620,14 +804,16 @@ class AOIView(tk.Toplevel):
                 self.current_image_path = None
                 self.current_item_code = None
                 self.current_lot_number = None
-                messagebox.showwarning("Warning", "指定された品目コードに対応する画像が見つかりません。")
+                messagebox.showwarning(
+                    "Warning", "指定された品目コードに対応する画像が見つかりません。"
+                )
                 return
 
         # 画像名から機種情報を取得
         if self.current_image_path:
             baseName = os.path.basename(self.current_image_path).split(".")[0]
             self.current_image_filename = baseName
-            parts = baseName.split('_')
+            parts = baseName.split("_")
             model_name = parts[1] if len(parts) > 1 else ""
             board_name = parts[2] if len(parts) > 2 else ""
             side_label = parts[3] if len(parts) > 3 else ""
@@ -658,20 +844,22 @@ class AOIView(tk.Toplevel):
             self.defect_number_update()
 
         if not (self.current_lot_number and self.current_item_code):
-            messagebox.showinfo("Info", "品目コードと指図の変更がキャンセルされました。")
+            messagebox.showinfo(
+                "Info", "品目コードと指図の変更がキャンセルされました。"
+            )
             return
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
-        """ 指図名のバリデーション """
+        """指図名のバリデーション"""
         if not lot_name:
             return False
-        regex = r'^\d{7}-10$|^\d{7}-20$'
+        regex = r"^\d{7}-10$|^\d{7}-20$"
         return bool(re.match(regex, lot_name))
 
     def change_user(self):
-        """ ユーザー名を変更するダイアログを開く """
+        """ユーザー名を変更するダイアログを開く"""
         dialog = ChangeUserDialog(self)
-        if not hasattr(dialog, 'result') or not dialog.result:
+        if not hasattr(dialog, "result") or not dialog.result:
             messagebox.showinfo("Info", "ユーザー名の変更がキャンセルされました。")
             return
         user_id = dialog.result.upper()
@@ -681,7 +869,7 @@ class AOIView(tk.Toplevel):
         if not user_csv_path.exists():
             raise FileNotFoundError(f"user.csv not found at {user_csv_path}")
         df = pd.read_csv(user_csv_path)
-        user_ids = df['id'].tolist()
+        user_ids = df["id"].tolist()
         # user_ids内の要素を文字列に変換
         user_ids = [str(uid) for uid in user_ids]
         if user_id not in user_ids:
@@ -689,21 +877,21 @@ class AOIView(tk.Toplevel):
             return
         # ユーザーIDに対応する名前を取得
 
-        matching_rows = df.loc[df['id'] == user_id, 'name']
+        matching_rows = df.loc[df["id"] == user_id, "name"]
         if matching_rows.empty:
             messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
             return
         self.user_name = matching_rows.values[0]
         # AOI担当ラベルを更新
         self.aoi_user_label_value.config(text=self.user_name)
-    
+
     def is_set_user(self) -> bool:
-        """ ユーザー名が設定されているか確認 """
+        """ユーザー名が設定されているか確認"""
         user = self.aoi_user_label_value.cget("text")
         return bool(user)
 
     def convert_defect_name(self):
-        """ 不良項目名を変換する """
+        """不良項目名を変換する"""
         defect_number = self.defect_entry.get()
         if not defect_number:
             return
@@ -714,36 +902,121 @@ class AOIView(tk.Toplevel):
         # defect_mapping.csvをDataFrameで読み込み
         mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
         if not mapping_csv_path.exists():
-            raise FileNotFoundError(f"defect_mapping.csv not found at {mapping_csv_path}")
+            raise FileNotFoundError(
+                f"defect_mapping.csv not found at {mapping_csv_path}"
+            )
         df = pd.read_csv(mapping_csv_path)
         # defect_numberがdfの'alias'列に存在するか確認
-        if defect_number in df['no'].values:
+        if defect_number in df["no"].values:
             # 対応する'name'列の値を取得してエントリに設定
-            standard_name = df.loc[df['no'] == defect_number, 'name'].values[0]
+            standard_name = df.loc[df["no"] == defect_number, "name"].values[0]
             self.defect_entry.delete(0, tk.END)
             self.defect_entry.insert(0, standard_name)
-    
+
     def show_defect_mapping(self):
-        """ 不良名一覧を表示する """
+        """不良名一覧を表示する"""
         mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
         if not mapping_csv_path.exists():
-            raise FileNotFoundError(f"defect_mapping.csv not found at {mapping_csv_path}")
+            raise FileNotFoundError(
+                f"defect_mapping.csv not found at {mapping_csv_path}"
+            )
         df = pd.read_csv(mapping_csv_path)
         df = df.dropna()
         # dfのno列をfloatだった場合にintに変換
-        df['no'] = df['no'].apply(lambda x: int(x) if isinstance(x, float) and x.is_integer() else x)
-        mapping_text = "\n".join([f"{row['no']}: {row['name']}" for _, row in df.iterrows()])
+        df["no"] = df["no"].apply(
+            lambda x: int(x) if isinstance(x, float) and x.is_integer() else x
+        )
+        mapping_text = "\n".join(
+            [f"{row['no']}: {row['name']}" for _, row in df.iterrows()]
+        )
         messagebox.showinfo("不良名一覧", mapping_text)
+
+    def post_kintone_record(self, defect_list: List[DefectInfo]):
+        # キントーン情報
+        subdomain = "x7xhupqlzylc"  # 例: "example"
+        app_id = 25  # アプリID
+        api_token = "TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo"
+
+        # エンドポイントURL
+        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
+
+        # ヘッダー
+        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
+
+        # self.defect_listをList[Dict]に変換
+        defect_list_dicts = []
+        for item in defect_list:
+            defect_dict = {
+                "updateKey": {"field": "unique_id", "value": item.id},
+                "revision": -1,
+                "record": {
+                    # "id": {"value": item.id},
+                    "model_code": {"value": item.model_code},
+                    "lot_number": {"value": item.lot_number},
+                    "current_board_index": {"value": item.current_board_index},
+                    "defect_number": {"value": item.defect_number},
+                    "serial": {"value": "item.serial"},
+                    "reference": {"value": item.reference},
+                    "defect_name": {"value": item.defect_name},
+                    "x": {"value": item.x},
+                    "y": {"value": item.y},
+                    "aoi_user": {"value": item.aoi_user},
+                    "insert_date": {"value": item.insert_date},
+                },
+            }
+            defect_list_dicts.append(defect_dict)
+
+        # POSTリクエスト送信
+        data = {"app": app_id, "records": defect_list_dicts, "upsert": True}
+        response = requests.put(url, headers=headers, data=json.dumps(data))
+
+        print(response.json())
+        # レスポンスでdefect_listのidを更新
+        if response.status_code == 200:
+            if "records" in response.json():
+                records = response.json()["records"]
+                for i, record in enumerate(records):
+                    if i < len(defect_list):
+                        defect_list[i].kintone_record_id = record["id"]
+
+        if response.status_code != 200:
+            raise ValueError(f"API送信エラー{response.json()}")
+
+    def delete_kintone_record(self, id: str):
+        # キントーン情報
+        subdomain = "x7xhupqlzylc"  # 例: "example"
+        app_id = 25  # アプリID
+        api_token = "TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo"
+
+        # エンドポイントURL
+        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
+
+        # ヘッダー
+        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
+
+        # DELETEリクエスト送信
+        data = {
+            "app": app_id,
+            "ids": [id],
+        }
+
+        response = requests.delete(url, headers=headers, data=json.dumps(data))
+
+        if response.status_code != 200:
+            raise ValueError(f"API削除エラー{response.json()}")
+
 
 class LotChangeDialog(simpledialog.Dialog):
     def body(self, master):
-        tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(row=0, columnspan=2)
-        
+        tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(
+            row=0, columnspan=2
+        )
+
         # 品目コードエントリ
         tk.Label(master, text="品目コード:").grid(row=1, column=0, sticky="w")
         self.item_code_entry = tk.Entry(master)
         self.item_code_entry.grid(row=1, column=1, padx=5, pady=5)
-        
+
         # 指図エントリ
         tk.Label(master, text="指図:").grid(row=2, column=0, sticky="w")
         self.lot_entry = tk.Entry(master)
@@ -751,7 +1024,7 @@ class LotChangeDialog(simpledialog.Dialog):
 
         # Enterキーでlot_entryにフォーカスを移動
         self.item_code_entry.bind("<Return>", self.on_enter)
-        
+
         return self.item_code_entry  # 初期フォーカスをエントリに設定
 
     def apply(self):
@@ -761,41 +1034,52 @@ class LotChangeDialog(simpledialog.Dialog):
         self.lot_entry.focus_set()  # lot_entryにフォーカスを移動
         return "break"  # イベントの伝播を停止
 
+
 class SettingsDialog(simpledialog.Dialog):
 
     def __init__(self, parent):
         self.__read_settings()
         super().__init__(parent, title="設定")
-    
+
     def __read_settings(self):
         project_dir = PROJECT_DIR
         settings_path = project_dir / "settings.ini"
         if settings_path.exists():
             config = configparser.ConfigParser()
             config.read(settings_path, encoding="utf-8")
-            self.current_image_directory = config['DIRECTORIES'].get('image_directory', '')
-            self.current_data_directory = config['DIRECTORIES'].get('data_directory', '')
+            self.current_image_directory = config["DIRECTORIES"].get(
+                "image_directory", ""
+            )
+            self.current_data_directory = config["DIRECTORIES"].get(
+                "data_directory", ""
+            )
         else:
-            self.current_image_directory = ''
-            self.current_data_directory = ''
+            self.current_image_directory = ""
+            self.current_data_directory = ""
 
     def body(self, master):
-        tk.Label(master, text="データの保存場所を指定してください。").grid(row=0, columnspan=3, pady=10)
-        
+        tk.Label(master, text="データの保存場所を指定してください。").grid(
+            row=0, columnspan=3, pady=10
+        )
+
         # 画像ディレクトリ設定
         tk.Label(master, text="画像ディレクトリ:").grid(row=1, column=0, sticky="w")
         self.setting1_entry = tk.Entry(master, width=50)
         self.setting1_entry.grid(row=1, column=1, padx=5, pady=5)
         self.setting1_entry.insert(0, self.current_image_directory)
-        tk.Button(master, text="参照", command=self.select_image_directory).grid(row=1, column=2, padx=5)
-        
+        tk.Button(master, text="参照", command=self.select_image_directory).grid(
+            row=1, column=2, padx=5
+        )
+
         # データディレクトリ設定
         tk.Label(master, text="データディレクトリ:").grid(row=2, column=0, sticky="w")
         self.setting2_entry = tk.Entry(master, width=50)
         self.setting2_entry.grid(row=2, column=1, padx=5, pady=5)
         self.setting2_entry.insert(0, self.current_data_directory)
-        tk.Button(master, text="参照", command=self.select_data_directory).grid(row=2, column=2, padx=5)
-        
+        tk.Button(master, text="参照", command=self.select_data_directory).grid(
+            row=2, column=2, padx=5
+        )
+
         return self.setting1_entry  # 初期フォーカスをエントリに設定
 
     def select_image_directory(self):
@@ -805,7 +1089,9 @@ class SettingsDialog(simpledialog.Dialog):
             self.setting1_entry.insert(0, directory)
 
     def select_data_directory(self):
-        directory = filedialog.askdirectory(title="データディレクトリを選択してください")
+        directory = filedialog.askdirectory(
+            title="データディレクトリを選択してください"
+        )
         if directory:
             self.setting2_entry.delete(0, tk.END)
             self.setting2_entry.insert(0, directory)
@@ -813,15 +1099,18 @@ class SettingsDialog(simpledialog.Dialog):
     def apply(self):
         self.result = self.setting1_entry.get(), self.setting2_entry.get()
 
+
 class ChangeUserDialog(simpledialog.Dialog):
     def body(self, master):
-        tk.Label(master, text="新しいユーザーIDを入力してください。").grid(row=0, columnspan=2)
-        
+        tk.Label(master, text="新しいユーザーIDを入力してください。").grid(
+            row=0, columnspan=2
+        )
+
         # ユーザーエントリ
         tk.Label(master, text="ユーザーID:").grid(row=1, column=0, sticky="w")
         self.user_entry = tk.Entry(master)
         self.user_entry.grid(row=1, column=1, padx=5, pady=5)
-        
+
         return self.user_entry  # 初期フォーカスをエントリに設定
 
     def apply(self):

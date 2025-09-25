@@ -10,6 +10,6 @@ class RepairdInfo:
         parts_type: str - 部品分類（チップ/異形）
     """
     id: str 
-    is_repaird: bool = False
+    is_repaird: str = "未修理"
     parts_type: str = ""
     insert_date: str = ""

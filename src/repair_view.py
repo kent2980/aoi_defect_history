@@ -404,16 +404,16 @@ class RepairView(tk.Toplevel):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
-            unique_id = item.unique_id
-            find_repaird = [r for r in self.repaird_list if r.id == unique_id]
+            id = item.id
+            find_repaird = [r for r in self.repaird_list if r.id == id]
             if self.current_board_index == item.current_board_index:
                 if len(find_repaird) > 0:
                     repaird_item = find_repaird[0]
-                    repaird_str = "済" if repaird_item.is_repaird == True else ""
+                    repaird_str = "済" if repaird_item.is_repaird == "修理済み" else ""
                     parts_type = repaird_item.parts_type if repaird_item.parts_type in ["C/R", "異形"] else ""
-                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, parts_type, repaird_str], tags=item.unique_id)
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, parts_type, repaird_str], tags=item.id)
                 else:
-                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""], tags=item.unique_id)
+                    self.defect_listbox.insert("", "end", values=[item.defect_number, item.reference, item.defect_name, "", ""], tags=item.id)
         self.defect_number_update()
     
     def update_index(self):
@@ -617,9 +617,9 @@ class RepairView(tk.Toplevel):
             raise ValueError("Defect list is empty.")
         repaird_list_ids = [item.id for item in self.repaird_list]
         for defect in self.defect_list:
-            if defect.unique_id not in repaird_list_ids:
+            if defect.id not in repaird_list_ids:
                 self.repaird_list.append(RepairdInfo(
-                    id=defect.unique_id,
+                    id=defect.id,
                 ))
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
@@ -715,8 +715,8 @@ class RepairView(tk.Toplevel):
         # repaird_listを更新)
         for r in self.repaird_list:
             if r.id == item_tags[0]:
-                r.is_repaird = repaird == "済"
-                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                r.is_repaird = "修理済み"
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M")
                 break
         df = DataFrame([asdict(r) for r in self.repaird_list])
         df.to_csv(Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number), index=False, encoding="utf-8-sig")
@@ -736,7 +736,7 @@ class RepairView(tk.Toplevel):
         for r in self.repaird_list:
             if r.id == item_tags[0]:
                 r.parts_type = "C/R"
-                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M")
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
@@ -757,7 +757,7 @@ class RepairView(tk.Toplevel):
         for r in self.repaird_list:
             if r.id == item_tags[0]:
                 r.parts_type = "異形"
-                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M")
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
