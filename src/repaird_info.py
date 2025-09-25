@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass
 class RepairdInfo:
     """
@@ -9,7 +10,9 @@ class RepairdInfo:
         is_repaird: bool - 修理済みフラグ（デフォルトはFalse）
         parts_type: str - 部品分類（チップ/異形）
     """
-    id: str 
+
+    id: str
     is_repaird: str = "未修理"
     parts_type: str = ""
     insert_date: str = ""
+    kintone_record_id: str = ""
