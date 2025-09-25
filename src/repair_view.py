@@ -695,6 +695,15 @@ class RepairView(tk.Toplevel):
             )
             return
 
+        if len(self.repaird_list) > 0:
+            try:
+                self.post_kintone_record(self.repaird_list)
+            except ValueError as e:
+                messagebox.showerror(
+                    "Error", f"Failed to post records to Kintone:\n{e}"
+                )
+                return
+
         # 品目コードと指図を入力するダイアログを表示
         dialog = LotChangeDialog(self)
         if not hasattr(dialog, "result") or not dialog.result:
@@ -953,7 +962,9 @@ class RepairView(tk.Toplevel):
         for r in self.repaird_list:
             if r.id == item_tags[0]:
                 r.parts_type = "C/R"
-                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+                r.insert_date = datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )  # 登録日時
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
@@ -987,7 +998,9 @@ class RepairView(tk.Toplevel):
         for r in self.repaird_list:
             if r.id == item_tags[0]:
                 r.parts_type = "異形"
-                r.insert_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+                r.insert_date = datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )  # 登録日時
                 break
         # repaird_listをCSVに保存
         df = DataFrame([asdict(r) for r in self.repaird_list])
