@@ -517,6 +517,11 @@ class AOIView(tk.Toplevel):
         aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
         model_code = self.current_item_code if self.current_item_code else ""
         lot_number = self.current_lot_number if self.current_lot_number else ""
+        model_name = self.model_label_value.cget("text")
+        board_name = self.board_label_value.cget("text")
+        side_label = self.side_label_value.cget("text")
+        model_label = model_name + " " + board_name
+        board_label = model_label + " " + side_label
 
         # 座標を取得
         x, y = self.current_coordinates if self.current_coordinates else (None, None)
@@ -542,6 +547,8 @@ class AOIView(tk.Toplevel):
             aoi_user=aoi_user,
             model_code=model_code,
             lot_number=lot_number,
+            model_label=model_label,
+            board_label=board_label,
         )
         self.defect_list_insert(defect)
 
@@ -950,7 +957,6 @@ class AOIView(tk.Toplevel):
                 "updateKey": {"field": "unique_id", "value": item.id},
                 "revision": -1,
                 "record": {
-                    # "id": {"value": item.id},
                     "model_code": {"value": item.model_code},
                     "lot_number": {"value": item.lot_number},
                     "current_board_index": {"value": item.current_board_index},
@@ -962,6 +968,8 @@ class AOIView(tk.Toplevel):
                     "y": {"value": item.y},
                     "aoi_user": {"value": item.aoi_user},
                     "insert_date": {"value": item.insert_date},
+                    "model_label": {"value": item.model_label},
+                    "board_label": {"value": item.board_label},
                 },
             }
             defect_list_dicts.append(defect_dict)
@@ -970,7 +978,6 @@ class AOIView(tk.Toplevel):
         data = {"app": app_id, "records": defect_list_dicts, "upsert": True}
         response = requests.put(url, headers=headers, data=json.dumps(data))
 
-        print(response.json())
         # レスポンスでdefect_listのidを更新
         if response.status_code == 200:
             if "records" in response.json():
@@ -978,6 +985,10 @@ class AOIView(tk.Toplevel):
                 for i, record in enumerate(records):
                     if i < len(defect_list):
                         defect_list[i].kintone_record_id = record["id"]
+
+        # 更新したdefect_listでcsv保存
+        self.defect_list = defect_list
+        self.defect_list_to_csv()
 
         if response.status_code != 200:
             raise ValueError(f"API送信エラー{response.json()}")

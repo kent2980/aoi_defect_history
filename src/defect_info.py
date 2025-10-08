@@ -34,6 +34,8 @@ class DefectInfo:
     y: int = 0
     aoi_user: str = ""
     insert_date: str = ""
+    model_label: str = ""
+    board_label: str = ""
     kintone_record_id: str = ""
 
     def __post_init__(self):
