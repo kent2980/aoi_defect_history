@@ -13,13 +13,16 @@ import pandas as pd
 import re
 from dataclasses import asdict
 from typing import List
+import threading
 
 from src.repaird_info import RepairdInfo
 from .defect_info import DefectInfo
 from .utils import Utils
+from .sub_window.settings_window import SettingsWindow
 from pathlib import Path
 import requests
 import json
+from ktec_smt_schedule import SMTSchedule
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -44,6 +47,7 @@ class AOIView(tk.Toplevel):
         # ディレクトリ設定
         self.image_directory = None
         self.data_directory = None
+        self.schedule_directory = None
 
         # 設定読み込み
         self.__read_settings()
@@ -55,6 +59,10 @@ class AOIView(tk.Toplevel):
         self.create_widgets_area()
         self.create_canvas_widgets()
         self.create_defect_list_widgets()
+        self.create_status_bar()
+
+        # SMTスケジュール非同期読み込み開始（ステータスバー作成後）
+        self.read_smt_schedule_async()
 
         # 現在の座標情報
         self.current_coordinates = None
@@ -90,6 +98,66 @@ class AOIView(tk.Toplevel):
             # 例: 画像ディレクトリとデータディレクトリを取得
             self.image_directory = config["DIRECTORIES"].get("image_directory", "")
             self.data_directory = config["DIRECTORIES"].get("data_directory", "")
+            self.schedule_directory = config["DIRECTORIES"].get(
+                "schedule_directory", ""
+            )
+
+    def read_smt_schedule_async(self):
+        """SMTスケジュールを非同期で読み込み"""
+
+        def _read_schedule():
+            try:
+                self.after(0, lambda: self.update_smt_status("読み込み中...", "orange"))
+                self.after(
+                    0, lambda: self.update_status("SMTスケジュールを読み込み中...")
+                )
+
+                if self.schedule_directory:
+                    sc = SMTSchedule.get_lot_infos(self.schedule_directory, 1, 9)
+                    output_path = PROJECT_DIR / "smt_schedule.csv"
+                    sc.to_csv(output_path, index=False)
+
+                    # 成功時の処理
+                    self.after(
+                        0, lambda: self.update_smt_status("読み込み完了", "green")
+                    )
+                    self.after(
+                        0,
+                        lambda: self.update_status(
+                            "SMTスケジュールの読み込みが完了しました"
+                        ),
+                    )
+                    print("SMTスケジュールの読み込みが完了しました。")
+                else:
+                    # ディレクトリ未設定時
+                    self.after(0, lambda: self.update_smt_status("未設定", "gray"))
+                    self.after(
+                        0,
+                        lambda: self.update_status(
+                            "スケジュールディレクトリが設定されていません"
+                        ),
+                    )
+                    print("スケジュールディレクトリが設定されていません。")
+            except Exception as e:
+                # エラー時の処理
+                error_msg = f"SMTスケジュール読み込みエラー: {e}"
+                self.after(0, lambda: self.update_smt_status("エラー", "red"))
+                self.after(0, lambda: self.update_status(error_msg))
+                print(error_msg)
+
+        # バックグラウンドスレッドで実行
+        thread = threading.Thread(target=_read_schedule, daemon=True)
+        thread.start()
+
+    def read_smt_schedule(self):
+        """同期版 - 後方互換性のため保持"""
+        try:
+            if self.schedule_directory:
+                sc = SMTSchedule.get_lot_infos(self.schedule_directory, 1, 9)
+                output_path = PROJECT_DIR / "smt_schedule.csv"
+                sc.to_csv(output_path, index=False)
+        except Exception as e:
+            print(f"SMTスケジュール読み込みエラー: {e}")
 
     def create_menu(self):
         menubar = tk.Menu(self)
@@ -344,6 +412,51 @@ class AOIView(tk.Toplevel):
         self.defect_listbox.configure(yscrollcommand=scrollbar.set)
         # Treeviewの選択イベントをバインド
         self.defect_listbox.bind("<<TreeviewSelect>>", self.on_defect_select)
+
+    def create_status_bar(self):
+        """ステータスバーを作成"""
+        self.status_frame = tk.Frame(self, relief=tk.SUNKEN, bd=1)
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # ステータスメッセージラベル
+        self.status_label = tk.Label(
+            self.status_frame, text="準備完了", font=("Yu Gothic UI", 9), anchor="w"
+        )
+        self.status_label.pack(side=tk.LEFT, padx=5, pady=2)
+
+        # 右側の情報表示エリア
+        self.status_right_frame = tk.Frame(self.status_frame)
+        self.status_right_frame.pack(side=tk.RIGHT, padx=5, pady=2)
+
+        # SMTスケジュール読み込み状況
+        self.smt_status_label = tk.Label(
+            self.status_right_frame,
+            text="SMT計画表: 待機中",
+            font=("Yu Gothic UI", 9),
+            fg="orange",
+        )
+        self.smt_status_label.pack(side=tk.RIGHT, padx=10)
+
+        # 接続状況インジケータ
+        self.connection_label = tk.Label(
+            self.status_right_frame, text="● 未接続", font=("Yu Gothic UI", 9), fg="red"
+        )
+        self.connection_label.pack(side=tk.RIGHT, padx=10)
+
+    def update_status(self, message: str):
+        """ステータスメッセージを更新"""
+        self.status_label.config(text=message)
+
+    def update_smt_status(self, status: str, color: str = "black"):
+        """SMTスケジュール読み込み状況を更新"""
+        self.smt_status_label.config(text=f"SMT計画表: {status}", fg=color)
+
+    def update_connection_status(self, connected: bool):
+        """接続状況を更新"""
+        if connected:
+            self.connection_label.config(text="● 接続済み", fg="green")
+        else:
+            self.connection_label.config(text="● 未接続", fg="red")
 
     def before_close(self):
         """閉じる前の処理"""
@@ -724,13 +837,15 @@ class AOIView(tk.Toplevel):
 
     def open_settings(self):
         """設定ダイアログを開く"""
-        dialog = SettingsDialog(self)
+        dialog = SettingsWindow(self)
+        self.wait_window(dialog)  # ダイアログが閉じるまで待機
         new_settings = dialog.result
         project_dir = PROJECT_DIR
         if new_settings:
             # 新しい設定を適用
             self.image_directory = new_settings[0]
             self.data_directory = new_settings[1]
+            self.schedule_directory = new_settings[2]
             # 設定ファイルが存在しない場合は新規作成
             settings_path = project_dir / "settings.ini"
             if not settings_path.exists():
@@ -739,6 +854,7 @@ class AOIView(tk.Toplevel):
                 config["DIRECTORIES"] = {
                     "image_directory": new_settings[0],
                     "data_directory": new_settings[1],
+                    "schedule_directory": new_settings[2],
                 }
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
@@ -748,12 +864,13 @@ class AOIView(tk.Toplevel):
                 config.read(settings_path, encoding="utf-8")
                 config["DIRECTORIES"]["image_directory"] = new_settings[0]
                 config["DIRECTORIES"]["data_directory"] = new_settings[1]
+                config["DIRECTORIES"]["schedule_directory"] = new_settings[2]
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
 
             messagebox.showinfo(
                 "Info",
-                f"新しい設定: {new_settings[0]}, {new_settings[1]} に変更されました。",
+                f"新しい設定: {new_settings[0]}, {new_settings[1]}, {new_settings[2]} に変更されました。",
             )
         else:
             messagebox.showinfo("Info", "設定の変更がキャンセルされました。")
@@ -1044,71 +1161,6 @@ class LotChangeDialog(simpledialog.Dialog):
     def on_enter(self, event):
         self.lot_entry.focus_set()  # lot_entryにフォーカスを移動
         return "break"  # イベントの伝播を停止
-
-
-class SettingsDialog(simpledialog.Dialog):
-
-    def __init__(self, parent):
-        self.__read_settings()
-        super().__init__(parent, title="設定")
-
-    def __read_settings(self):
-        project_dir = PROJECT_DIR
-        settings_path = project_dir / "settings.ini"
-        if settings_path.exists():
-            config = configparser.ConfigParser()
-            config.read(settings_path, encoding="utf-8")
-            self.current_image_directory = config["DIRECTORIES"].get(
-                "image_directory", ""
-            )
-            self.current_data_directory = config["DIRECTORIES"].get(
-                "data_directory", ""
-            )
-        else:
-            self.current_image_directory = ""
-            self.current_data_directory = ""
-
-    def body(self, master):
-        tk.Label(master, text="データの保存場所を指定してください。").grid(
-            row=0, columnspan=3, pady=10
-        )
-
-        # 画像ディレクトリ設定
-        tk.Label(master, text="画像ディレクトリ:").grid(row=1, column=0, sticky="w")
-        self.setting1_entry = tk.Entry(master, width=50)
-        self.setting1_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.setting1_entry.insert(0, self.current_image_directory)
-        tk.Button(master, text="参照", command=self.select_image_directory).grid(
-            row=1, column=2, padx=5
-        )
-
-        # データディレクトリ設定
-        tk.Label(master, text="データディレクトリ:").grid(row=2, column=0, sticky="w")
-        self.setting2_entry = tk.Entry(master, width=50)
-        self.setting2_entry.grid(row=2, column=1, padx=5, pady=5)
-        self.setting2_entry.insert(0, self.current_data_directory)
-        tk.Button(master, text="参照", command=self.select_data_directory).grid(
-            row=2, column=2, padx=5
-        )
-
-        return self.setting1_entry  # 初期フォーカスをエントリに設定
-
-    def select_image_directory(self):
-        directory = filedialog.askdirectory(title="画像ディレクトリを選択してください")
-        if directory:
-            self.setting1_entry.delete(0, tk.END)
-            self.setting1_entry.insert(0, directory)
-
-    def select_data_directory(self):
-        directory = filedialog.askdirectory(
-            title="データディレクトリを選択してください"
-        )
-        if directory:
-            self.setting2_entry.delete(0, tk.END)
-            self.setting2_entry.insert(0, directory)
-
-    def apply(self):
-        self.result = self.setting1_entry.get(), self.setting2_entry.get()
 
 
 class ChangeUserDialog(simpledialog.Dialog):

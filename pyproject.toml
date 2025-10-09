@@ -15,4 +15,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-ktec-smt-schedule = { git = "https://github.com/kent2980/ktec_smt_schedule.git" }
+ktec-smt-schedule = { path = "../ktec_smt_schedule" }

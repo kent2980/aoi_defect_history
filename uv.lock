@@ -20,7 +20,7 @@ dependencies = [
 requires-dist = [
     { name = "autopep8", specifier = ">=2.3.2" },
     { name = "black", specifier = ">=25.9.0" },
-    { name = "ktec-smt-schedule", git = "https://github.com/kent2980/ktec_smt_schedule.git" },
+    { name = "ktec-smt-schedule", directory = "../ktec_smt_schedule" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "requests", specifier = ">=2.32.5" },
@@ -276,7 +276,7 @@ wheels = [
 [[package]]
 name = "ktec-smt-schedule"
 version = "0.1.0"
-source = { git = "https://github.com/kent2980/ktec_smt_schedule.git#a76f28e42f1428be030e1e05caaa0e3de1bb4dc7" }
+source = { directory = "../ktec_smt_schedule" }
 dependencies = [
     { name = "cookiecutter" },
     { name = "openpyxl" },
@@ -287,6 +287,19 @@ dependencies = [
     { name = "styleframe" },
     { name = "wheel" },
     { name = "xlrd" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cookiecutter", specifier = ">=2.6.0" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pandas", specifier = ">=2.3.3" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pyxlsb", specifier = ">=1.0.10" },
+    { name = "setuptools", specifier = ">=80.9.0" },
+    { name = "styleframe", specifier = ">=4.2" },
+    { name = "wheel", specifier = ">=0.45.1" },
+    { name = "xlrd", specifier = ">=2.0.2" },
 ]
 
 [[package]]
