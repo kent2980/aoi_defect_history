@@ -15,9 +15,7 @@ from dataclasses import asdict
 from typing import List
 import threading
 
-from src.repaird_info import RepairdInfo
-from .defect_info import DefectInfo
-from .utils import Utils
+from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 from .sub_window.settings_window import SettingsWindow
 from pathlib import Path
 import requests
@@ -48,6 +46,13 @@ class AOIView(tk.Toplevel):
         self.image_directory = None
         self.data_directory = None
         self.schedule_directory = None
+
+        # Kintoneクライアントの初期化
+        self.defect_kintone_client = KintoneClient(
+            subdomain="x7xhupqlzylc",
+            app_id=25,
+            api_token="TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo",
+        )
 
         # 設定読み込み
         self.__read_settings()
@@ -574,32 +579,14 @@ class AOIView(tk.Toplevel):
     def read_defect_list_csv(self, filepath: str):
         """CSVファイルから不良リストを読み込み、defect_listに設定"""
         try:
-            # 不良データ取得処理
-            if Path(filepath).exists():
-                df = DataFrame(pd.read_csv(filepath))
-                self.defect_list = [
-                    DefectInfo(**row) for row in df.to_dict(orient="records")
-                ]
-            else:
-                self.defect_list = []
-            # 修理データ取得処理
-            if os.path.exists(
-                Utils.create_repaird_csv_path(
-                    self.data_directory, self.current_lot_number
-                )
-            ):
-                repaird_df = DataFrame(
-                    pd.read_csv(
-                        Utils.create_repaird_csv_path(
-                            self.data_directory, self.current_lot_number
-                        )
-                    )
-                )
-                self.repaird_list = [
-                    RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")
-                ]
-            else:
-                self.repaird_list = []
+            # ライブラリを使用して不良データを取得
+            self.defect_list = FileManager.read_defect_csv(filepath)
+
+            # 修理データを取得
+            repaird_path = FileManager.create_repaird_csv_path(
+                self.data_directory, self.current_lot_number
+            )
+            self.repaird_list = FileManager.read_repaird_csv(repaird_path)
             self.update_defect_listbox()
         except Exception as e:
             raise Exception(e)
@@ -806,9 +793,12 @@ class AOIView(tk.Toplevel):
     def defect_list_to_csv(self):
         """defect_listをCSVファイルに保存"""
         try:
-            df = DataFrame([asdict(item) for item in self.defect_list])
-            file_path = self.read_csv_path()
-            df.to_csv(file_path, index=False, encoding="utf-8-sig")
+            file_path = FileManager.create_defect_csv_path(
+                self.data_directory,
+                self.current_lot_number,
+                self.current_image_filename,
+            )
+            FileManager.save_defect_csv(self.defect_list, file_path)
         except OSError as e:
             raise OSError(e)
         except Exception as e:
@@ -819,21 +809,13 @@ class AOIView(tk.Toplevel):
             text=f"{self.current_board_index} / {self.total_boards} 枚"
         )
 
-    def create_csv_filename(self):
-        """指図に対応するCSVファイル名を生成"""
-        if not self.current_lot_number:
-            raise ValueError("Current lot number is not set.")
-        if not self.current_image_filename:
-            raise ValueError("Current image filename is not set.")
-        return f"{self.current_lot_number}_{self.current_image_filename}.csv"
-
     def read_csv_path(self):
         """指図に対応するCSVファイルのパスを取得"""
         if not self.current_image_filename:
             raise ValueError("Current image filename is not set.")
-        csv_filename = self.create_csv_filename()
-        csv_path = Path.joinpath(Path(self.data_directory), csv_filename)
-        return csv_path.as_posix()
+        return FileManager.create_defect_csv_path(
+            self.data_directory, self.current_lot_number, self.current_image_filename
+        )
 
     def open_settings(self):
         """設定ダイアログを開く"""
@@ -986,28 +968,27 @@ class AOIView(tk.Toplevel):
         if not hasattr(dialog, "result") or not dialog.result:
             messagebox.showinfo("Info", "ユーザー名の変更がキャンセルされました。")
             return
+
         user_id = dialog.result.upper()
-
-        # user.csvをDataFrameで読み込み
         user_csv_path = PROJECT_DIR / "user.csv"
-        if not user_csv_path.exists():
-            raise FileNotFoundError(f"user.csv not found at {user_csv_path}")
-        df = pd.read_csv(user_csv_path)
-        user_ids = df["id"].tolist()
-        # user_ids内の要素を文字列に変換
-        user_ids = [str(uid) for uid in user_ids]
-        if user_id not in user_ids:
-            messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
-            return
-        # ユーザーIDに対応する名前を取得
 
-        matching_rows = df.loc[df["id"] == user_id, "name"]
-        if matching_rows.empty:
-            messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
-            return
-        self.user_name = matching_rows.values[0]
-        # AOI担当ラベルを更新
-        self.aoi_user_label_value.config(text=self.user_name)
+        try:
+            df = FileManager.read_user_csv(str(user_csv_path))
+            user_ids = [str(uid) for uid in df["id"].tolist()]
+
+            if user_id not in user_ids:
+                messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
+                return
+
+            matching_rows = df.loc[df["id"] == user_id, "name"]
+            if matching_rows.empty:
+                messagebox.showerror("Error", f"ユーザーID: {user_id} は存在しません。")
+                return
+
+            self.user_name = matching_rows.values[0]
+            self.aoi_user_label_value.config(text=self.user_name)
+        except Exception as e:
+            messagebox.showerror("Error", f"ユーザー情報の読み込みエラー: {e}")
 
     def is_set_user(self) -> bool:
         """ユーザー名が設定されているか確認"""
@@ -1017,25 +998,20 @@ class AOIView(tk.Toplevel):
     def convert_defect_name(self):
         """不良項目名を変換する"""
         defect_number = self.defect_entry.get()
-        if not defect_number:
+        if not defect_number or not defect_number.isdigit():
             return
-        # defect_numberがintに変換できない場合は例外をスロー
-        if not defect_number.isdigit():
-            return
+
         defect_number = int(defect_number)
-        # defect_mapping.csvをDataFrameで読み込み
         mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
-        if not mapping_csv_path.exists():
-            raise FileNotFoundError(
-                f"defect_mapping.csv not found at {mapping_csv_path}"
-            )
-        df = pd.read_csv(mapping_csv_path)
-        # defect_numberがdfの'alias'列に存在するか確認
-        if defect_number in df["no"].values:
-            # 対応する'name'列の値を取得してエントリに設定
-            standard_name = df.loc[df["no"] == defect_number, "name"].values[0]
-            self.defect_entry.delete(0, tk.END)
-            self.defect_entry.insert(0, standard_name)
+
+        try:
+            df = FileManager.read_defect_mapping(str(mapping_csv_path))
+            if defect_number in df["no"].values:
+                standard_name = df.loc[df["no"] == defect_number, "name"].values[0]
+                self.defect_entry.delete(0, tk.END)
+                self.defect_entry.insert(0, standard_name)
+        except Exception as e:
+            print(f"Error converting defect name: {e}")
 
     def show_defect_mapping(self):
         """不良名一覧を表示する"""
@@ -1056,82 +1032,22 @@ class AOIView(tk.Toplevel):
         messagebox.showinfo("不良名一覧", mapping_text)
 
     def post_kintone_record(self, defect_list: List[DefectInfo]):
-        # キントーン情報
-        subdomain = "x7xhupqlzylc"  # 例: "example"
-        app_id = 25  # アプリID
-        api_token = "TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo"
+        """不良レコードをKintoneに送信"""
+        try:
+            updated_defect_list = self.defect_kintone_client.post_defect_records(
+                defect_list
+            )
+            self.defect_list = updated_defect_list
+            self.defect_list_to_csv()
+        except Exception as e:
+            raise ValueError(f"API送信エラー: {e}")
 
-        # エンドポイントURL
-        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
-
-        # ヘッダー
-        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
-
-        # self.defect_listをList[Dict]に変換
-        defect_list_dicts = []
-        for item in defect_list:
-            defect_dict = {
-                "updateKey": {"field": "unique_id", "value": item.id},
-                "revision": -1,
-                "record": {
-                    "model_code": {"value": item.model_code},
-                    "lot_number": {"value": item.lot_number},
-                    "current_board_index": {"value": item.current_board_index},
-                    "defect_number": {"value": item.defect_number},
-                    "serial": {"value": "item.serial"},
-                    "reference": {"value": item.reference},
-                    "defect_name": {"value": item.defect_name},
-                    "x": {"value": item.x},
-                    "y": {"value": item.y},
-                    "aoi_user": {"value": item.aoi_user},
-                    "insert_date": {"value": item.insert_date},
-                    "model_label": {"value": item.model_label},
-                    "board_label": {"value": item.board_label},
-                },
-            }
-            defect_list_dicts.append(defect_dict)
-
-        # POSTリクエスト送信
-        data = {"app": app_id, "records": defect_list_dicts, "upsert": True}
-        response = requests.put(url, headers=headers, data=json.dumps(data))
-
-        # レスポンスでdefect_listのidを更新
-        if response.status_code == 200:
-            if "records" in response.json():
-                records = response.json()["records"]
-                for i, record in enumerate(records):
-                    if i < len(defect_list):
-                        defect_list[i].kintone_record_id = record["id"]
-
-        # 更新したdefect_listでcsv保存
-        self.defect_list = defect_list
-        self.defect_list_to_csv()
-
-        if response.status_code != 200:
-            raise ValueError(f"API送信エラー{response.json()}")
-
-    def delete_kintone_record(self, id: str):
-        # キントーン情報
-        subdomain = "x7xhupqlzylc"  # 例: "example"
-        app_id = 25  # アプリID
-        api_token = "TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo"
-
-        # エンドポイントURL
-        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
-
-        # ヘッダー
-        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
-
-        # DELETEリクエスト送信
-        data = {
-            "app": app_id,
-            "ids": [id],
-        }
-
-        response = requests.delete(url, headers=headers, data=json.dumps(data))
-
-        if response.status_code != 200:
-            raise ValueError(f"API削除エラー{response.json()}")
+    def delete_kintone_record(self, record_id: str):
+        """Kintoneレコードを削除"""
+        try:
+            self.defect_kintone_client.delete_record(record_id)
+        except Exception as e:
+            raise ValueError(f"API削除エラー: {e}")
 
 
 class LotChangeDialog(simpledialog.Dialog):

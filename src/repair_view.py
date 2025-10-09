@@ -13,9 +13,7 @@ import pandas as pd
 import re
 from dataclasses import asdict
 from typing import List
-from .defect_info import DefectInfo
-from .repaird_info import RepairdInfo
-from .utils import Utils
+from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 import requests
 import json
 
@@ -39,6 +37,13 @@ class RepairView(tk.Toplevel):
         # ディレクトリ設定
         self.image_directory = None
         self.data_directory = None
+
+        # Kintoneクライアントの初期化
+        self.repaird_kintone_client = KintoneClient(
+            subdomain="x7xhupqlzylc",
+            app_id=27,
+            api_token="69Yil0U13MGXORSZ5OLACJuGUnpEeTHcSxhy3Q0t",
+        )
 
         # 設定読み込み
         self.__read_settings()
@@ -471,29 +476,14 @@ class RepairView(tk.Toplevel):
     def read_defect_list_csv(self, filepath: str):
         """CSVファイルから不良リストを読み込み、defect_listに設定"""
         try:
-            # 不良データ取得処理
-            df = DataFrame(pd.read_csv(filepath))
-            self.defect_list = [
-                DefectInfo(**row) for row in df.to_dict(orient="records")
-            ]
-            # 修理データ取得処理
-            if os.path.exists(
-                Utils.create_repaird_csv_path(
-                    self.data_directory, self.current_lot_number
-                )
-            ):
-                repaird_df = DataFrame(
-                    pd.read_csv(
-                        Utils.create_repaird_csv_path(
-                            self.data_directory, self.current_lot_number
-                        )
-                    )
-                )
-                self.repaird_list = [
-                    RepairdInfo(**row) for row in repaird_df.to_dict(orient="records")
-                ]
-            else:
-                self.repaird_list = []
+            # ライブラリを使用してデータを読み込み
+            self.defect_list = FileManager.read_defect_csv(filepath)
+
+            repaird_path = FileManager.create_repaird_csv_path(
+                self.data_directory, self.current_lot_number
+            )
+            self.repaird_list = FileManager.read_repaird_csv(repaird_path)
+
             self.update_defect_listbox()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
@@ -931,12 +921,12 @@ class RepairView(tk.Toplevel):
                     "%Y-%m-%dT%H:%M:%SZ"
                 )  # 登録日時
                 break
-        df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(
-            Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number),
-            index=False,
-            encoding="utf-8-sig",
+
+        # ライブラリを使用してCSVに保存
+        repaird_path = FileManager.create_repaird_csv_path(
+            self.data_directory, self.current_lot_number
         )
+        FileManager.save_repaird_csv(self.repaird_list, repaird_path)
 
     def on_chip_button(self):
         """C/Rボタンが押されたときの処理"""
@@ -966,13 +956,12 @@ class RepairView(tk.Toplevel):
                     "%Y-%m-%dT%H:%M:%SZ"
                 )  # 登録日時
                 break
-        # repaird_listをCSVに保存
-        df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(
-            Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number),
-            index=False,
-            encoding="utf-8-sig",
+
+        # ライブラリを使用してCSVに保存
+        repaird_path = FileManager.create_repaird_csv_path(
+            self.data_directory, self.current_lot_number
         )
+        FileManager.save_repaird_csv(self.repaird_list, repaird_path)
 
     def on_other_button(self):
         """異形ボタンが押されたときの処理"""
@@ -1002,78 +991,29 @@ class RepairView(tk.Toplevel):
                     "%Y-%m-%dT%H:%M:%SZ"
                 )  # 登録日時
                 break
-        # repaird_listをCSVに保存
-        df = DataFrame([asdict(r) for r in self.repaird_list])
-        df.to_csv(
-            Utils.create_repaird_csv_path(self.data_directory, self.current_lot_number),
-            index=False,
-            encoding="utf-8-sig",
+
+        # ライブラリを使用してCSVに保存
+        repaird_path = FileManager.create_repaird_csv_path(
+            self.data_directory, self.current_lot_number
         )
+        FileManager.save_repaird_csv(self.repaird_list, repaird_path)
 
     def post_kintone_record(self, repaird_list: List[RepairdInfo]):
-        # キントーン情報
-        subdomain = "x7xhupqlzylc"  # 例: "example"
-        app_id = 27  # アプリID
-        api_token = "69Yil0U13MGXORSZ5OLACJuGUnpEeTHcSxhy3Q0t"
+        """修理レコードをKintoneに送信"""
+        try:
+            updated_repaird_list = self.repaird_kintone_client.post_repaird_records(
+                repaird_list
+            )
+            self.repaird_list = updated_repaird_list
+        except Exception as e:
+            raise ValueError(f"API送信エラー: {e}")
 
-        # エンドポイントURL
-        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
-
-        # ヘッダー
-        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
-
-        # self.repaird_listをList[Dict]に変換
-        repaird_list_dicts = []
-        for item in repaird_list:
-            repaird_dict = {
-                "updateKey": {"field": "unique_id", "value": item.id},
-                "revision": -1,
-                "record": {
-                    "is_repaird": {"value": item.is_repaird},
-                    "parts_type": {"value": item.parts_type},
-                    "insert_date": {"value": item.insert_date},
-                },
-            }
-            repaird_list_dicts.append(repaird_dict)
-
-        # POSTリクエスト送信
-        data = {"app": app_id, "records": repaird_list_dicts, "upsert": True}
-        response = requests.put(url, headers=headers, data=json.dumps(data))
-
-        print(response.json())
-        # レスポンスでdefect_listのidを更新
-        if response.status_code == 200:
-            if "records" in response.json():
-                records = response.json()["records"]
-                for i, record in enumerate(records):
-                    if i < len(repaird_list):
-                        repaird_list[i].kintone_record_id = record["id"]
-
-        if response.status_code != 200:
-            raise ValueError(f"API送信エラー{response.json()}")
-
-    def delete_kintone_record(self, id: str):
-        # キントーン情報
-        subdomain = "x7xhupqlzylc"  # 例: "example"
-        app_id = 27  # アプリID
-        api_token = "69Yil0U13MGXORSZ5OLACJuGUnpEeTHcSxhy3Q0t"
-
-        # エンドポイントURL
-        url = f"https://{subdomain}.cybozu.com/k/v1/records.json"
-
-        # ヘッダー
-        headers = {"X-Cybozu-API-Token": api_token, "Content-Type": "application/json"}
-
-        # DELETEリクエスト送信
-        data = {
-            "app": app_id,
-            "ids": [id],
-        }
-
-        response = requests.delete(url, headers=headers, data=json.dumps(data))
-
-        if response.status_code != 200:
-            raise ValueError(f"API削除エラー{response.json()}")
+    def delete_kintone_record(self, record_id: str):
+        """Kintoneレコードを削除"""
+        try:
+            self.repaird_kintone_client.delete_record(record_id)
+        except Exception as e:
+            raise ValueError(f"API削除エラー: {e}")
 
 
 class LotChangeDialog(simpledialog.Dialog):

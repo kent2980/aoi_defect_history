@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aoi-data-manager",
     "autopep8>=2.3.2",
     "black>=25.9.0",
     "ktec-smt-schedule",
@@ -16,3 +17,4 @@ dependencies = [
 
 [tool.uv.sources]
 ktec-smt-schedule = { path = "../ktec_smt_schedule" }
+aoi-data-manager = { path = "../aoi_data_manager" }
