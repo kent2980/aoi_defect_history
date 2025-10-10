@@ -7,6 +7,7 @@ PROJECT_DIR = Path(__file__).parent.parent.parent
 
 
 class SettingsWindow(tk.Toplevel):
+    """設定ウィンドウ"""
 
     def __init__(self, parent):
         super().__init__(parent)

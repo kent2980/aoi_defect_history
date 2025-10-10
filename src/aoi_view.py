@@ -6,53 +6,58 @@ from tkinter import ttk
 from PIL import Image, ImageTk
 import os
 from datetime import datetime, timezone
-from pandas import DataFrame
 from pathlib import Path
 import configparser
 import pandas as pd
 import re
-from dataclasses import asdict
 from typing import List
 import threading
 
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
-from .sub_window.settings_window import SettingsWindow
+from .sub_window import SettingsWindow, KintoneSettings
 from pathlib import Path
-import requests
-import json
 from ktec_smt_schedule import SMTSchedule
 
 PROJECT_DIR = Path(__file__).parent.parent
 
 
 class AOIView(tk.Toplevel):
-    def __init__(self, fillColor="white", master=None):
-        super().__init__(master)
-        self.title("AOI 製品経歴書")
-        # 最大化表示
-        self.option_add("*Background", "white")
-        self.option_add("*Entry.Background", "white")
-        self.option_add("*Label.Background", "white")
-        self.state("zoomed")
-        self.configure(bg="white")
+    """AOI製品経歴書ウィンドウ"""
 
-        # 閉じるボタン押下時の処理
+    def __init__(self, fillColor="white", master=None):
+        """
+        コンストラクタ
+
+        ### Args:
+        - fillColor (str): 塗りつぶし色
+        - master (tk.Tk): 親ウィンドウ
+        """
+        super().__init__(master)
+
+        # ウィンドウ設定
+        self.title("AOI 製品経歴書")  # タイトル設定
+        self.option_add("*Background", "white")  # 背景色を白に設定
+        self.option_add("*Entry.Background", "white")  # Entryの背景色を白に設定
+        self.option_add("*Label.Background", "white")  # Labelの背景色を白に設定
+        self.state("zoomed")  # ウィンドウを最大化
+        self.configure(bg="white")  # 背景色を白に設定
+
+        # 閉じるボタン押下時の処理を設定
         self.protocol("WM_DELETE_WINDOW", self.before_close)
 
         # 座標の塗りつぶし色
         self.fillColor = fillColor
 
         # ディレクトリ設定
-        self.image_directory = None
-        self.data_directory = None
-        self.schedule_directory = None
+        self.image_directory = None  # 画像ディレクトリ
+        self.data_directory = None  # データディレクトリ
+        self.schedule_directory = None  # 計画書ディレクトリ
 
         # Kintoneクライアントの初期化
-        self.defect_kintone_client = KintoneClient(
-            subdomain="x7xhupqlzylc",
-            app_id=25,
-            api_token="TKu2tVHehkWl2C1aIMnGqVYzGz6VOpSPUpzH9Bgo",
-        )
+        self.init_kintone_client()
+
+        # キントーン接続確認（非同期）
+        self.is_kintone_connected_async()
 
         # 設定読み込み
         self.__read_settings()
@@ -154,15 +159,39 @@ class AOIView(tk.Toplevel):
         thread = threading.Thread(target=_read_schedule, daemon=True)
         thread.start()
 
-    def read_smt_schedule(self):
-        """同期版 - 後方互換性のため保持"""
-        try:
-            if self.schedule_directory:
-                sc = SMTSchedule.get_lot_infos(self.schedule_directory, 1, 9)
-                output_path = PROJECT_DIR / "smt_schedule.csv"
-                sc.to_csv(output_path, index=False)
-        except Exception as e:
-            print(f"SMTスケジュール読み込みエラー: {e}")
+    def init_kintone_client(self):
+        """キントーンクライアントの初期化"""
+        kintone_settings_path = PROJECT_DIR / "kintone_settings.ini"
+        kintone_settings = FileManager.load_kintone_settings_file(
+            kintone_settings_path.as_posix()
+        )
+        self.kintone_client = KintoneClient(
+            subdomain=kintone_settings.get("subdomain"),
+            app_id=kintone_settings.get("app_id"),
+            api_token=kintone_settings.get("api_token"),
+        )
+
+    def is_kintone_connected_async(self) -> bool:
+        """キントーン接続を非同期で確認"""
+        result = {"connected": False}
+
+        def _check_connection():
+            try:
+                connected = self.kintone_client.is_connected()
+                result["connected"] = connected
+                status_msg = "キントーン接続済み" if connected else "キントーン未接続"
+                status_color = "green" if connected else "red"
+                self.after(0, lambda: self.update_connection_status(connected))
+                self.after(0, lambda: self.update_status(status_msg))
+            except Exception as e:
+                error_msg = f"キントーン接続エラー: {e}"
+                self.after(0, lambda: self.update_connection_status(False))
+                self.after(0, lambda: self.update_status(error_msg))
+                print(error_msg)
+
+        # バックグラウンドスレッドで実行
+        thread = threading.Thread(target=_check_connection, daemon=True)
+        thread.start()
 
     def create_menu(self):
         menubar = tk.Menu(self)
@@ -175,6 +204,9 @@ class AOIView(tk.Toplevel):
         help_menu = tk.Menu(menubar, tearoff=0)
         help_menu.add_command(label="不良名一覧", command=self.show_defect_mapping)
         menubar.add_cascade(label="ヘルプ", menu=help_menu)
+        kintoneMenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="キントーン設定", menu=kintoneMenu)
+        kintoneMenu.add_command(label="API設定", command=self.open_kintone_settings)
         self.config(menu=menubar)
 
     def create_header(self):
@@ -459,15 +491,15 @@ class AOIView(tk.Toplevel):
     def update_connection_status(self, connected: bool):
         """接続状況を更新"""
         if connected:
-            self.connection_label.config(text="● 接続済み", fg="green")
+            self.connection_label.config(text="● キントーンAPI接続済み", fg="green")
         else:
-            self.connection_label.config(text="● 未接続", fg="red")
+            self.connection_label.config(text="● キントーンAPIエラー", fg="red")
 
     def before_close(self):
         """閉じる前の処理"""
         if len(self.defect_list) > 0:
             try:
-                self.post_kintone_record(self.defect_list)
+                self.post_kintone_record_async(self.defect_list)
             except ValueError as e:
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
@@ -536,7 +568,7 @@ class AOIView(tk.Toplevel):
                 index
             ]  # defect_listから選択中のアイテムを取得
             x, y = defect_item.x, defect_item.y  # X, Y座標を取得
-
+            self.current_coordinates = (x, y)  # 現在の座標を更新
             # canvasに座標マーカーを表示
             if x is not None and y is not None:
                 r = 5
@@ -590,7 +622,6 @@ class AOIView(tk.Toplevel):
             self.update_defect_listbox()
         except Exception as e:
             raise Exception(e)
-            messagebox.showerror("Error", f"Failed to read defect list from CSV:\n{e}")
 
     def save_defect_info(self):
         """不良情報をdefect_listに追加し、defect_listboxを更新"""
@@ -634,6 +665,16 @@ class AOIView(tk.Toplevel):
             messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
             return
 
+        # defect_listにcurrent_board_indexとdefect_numberが重複する場合は置き換える
+        for idx, item in enumerate(self.defect_list):
+            if (
+                item.current_board_index == current_board_index
+                and item.defect_number == defect_number
+            ):
+                # 既存のアイテムを削除
+                self.defect_list_delete(idx, self.defect_listbox.get_children()[idx])
+                break
+
         # defect_listに追加
         defect = DefectInfo(
             current_board_index=current_board_index,
@@ -642,7 +683,7 @@ class AOIView(tk.Toplevel):
             defect_name=defect_name,
             x=x,
             y=y,
-            insert_date=insert_date,
+            insert_datetime=insert_date,
             serial=serial,
             aoi_user=aoi_user,
             model_code=model_code,
@@ -670,10 +711,11 @@ class AOIView(tk.Toplevel):
             # インデックス（0始まり）
             index = items.index(selected_item[0])
             kintone_record_id = self.defect_list[index].kintone_record_id
-            self.delete_kintone_record(kintone_record_id)
+            self.delete_kintone_record_async(kintone_record_id)
             self.defect_list_delete(index, selected_item[0])
             self.rf_entry.delete(0, tk.END)
             self.defect_entry.delete(0, tk.END)
+            self.defect_list_to_csv()
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
@@ -870,7 +912,7 @@ class AOIView(tk.Toplevel):
         # API送信
         if len(self.defect_list) > 0:
             try:
-                self.post_kintone_record(self.defect_list)
+                self.post_kintone_record_async(self.defect_list)
             except ValueError as e:
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
@@ -1031,23 +1073,47 @@ class AOIView(tk.Toplevel):
         )
         messagebox.showinfo("不良名一覧", mapping_text)
 
-    def post_kintone_record(self, defect_list: List[DefectInfo]):
-        """不良レコードをKintoneに送信"""
-        try:
-            updated_defect_list = self.defect_kintone_client.post_defect_records(
-                defect_list
-            )
-            self.defect_list = updated_defect_list
-            self.defect_list_to_csv()
-        except Exception as e:
-            raise ValueError(f"API送信エラー: {e}")
+    def open_kintone_settings(self):
+        """キントーン設定画面を開く"""
+        dialog = KintoneSettings(self)
+        self.wait_window(dialog)  # ダイアログが閉じるまで待機
+        result = dialog.result
+        if result:
+            self.init_kintone_client()
+            self.is_kintone_connected_async()
 
-    def delete_kintone_record(self, record_id: str):
+    def post_kintone_record_async(self, defect_list: List[DefectInfo]):
+        """不良レコードをKintoneに送信"""
+
+        def _send_request():
+            try:
+                updated_defect_list = self.kintone_client.post_defect_records(
+                    defect_list
+                )
+                self.defect_list = updated_defect_list
+                self.defect_list_to_csv()
+                # 成功したらステータスバーを更新
+                count = len(updated_defect_list)
+                if count > 0:
+                    self.update_status("キントーンアプリにレコードを登録しました。")
+            except Exception as e:
+                raise ValueError(f"API送信エラー: {e}")
+
+        thread = threading.Thread(target=_send_request)
+        thread.start()
+
+    def delete_kintone_record_async(self, record_id: str):
         """Kintoneレコードを削除"""
-        try:
-            self.defect_kintone_client.delete_record(record_id)
-        except Exception as e:
-            raise ValueError(f"API削除エラー: {e}")
+
+        def _delete_request():
+            try:
+                self.kintone_client.delete_record(record_id)
+                self.update_status("キントーンアプリからレコードを削除しました。")
+            except Exception as e:
+                raise ValueError(f"API削除エラー: {e}")
+
+        thread = threading.Thread(target=_delete_request)
+        thread.start()
 
 
 class LotChangeDialog(simpledialog.Dialog):
