@@ -4,7 +4,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "aoi-data-manager"
-version = "0.1.16"
+version = "0.1.22"
 source = { directory = "../aoi_data_manager" }
 dependencies = [
     { name = "pandas" },
@@ -306,7 +306,7 @@ wheels = [
 
 [[package]]
 name = "ktec-smt-schedule"
-version = "0.1.0"
+version = "0.1.1"
 source = { directory = "../ktec_smt_schedule" }
 dependencies = [
     { name = "cookiecutter" },

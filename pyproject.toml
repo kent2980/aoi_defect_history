@@ -16,5 +16,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-ktec-smt-schedule = { path = "../ktec_smt_schedule" }
 aoi-data-manager = { path = "../aoi_data_manager" }
+ktec-smt-schedule = { path = "../ktec_smt_schedule" }

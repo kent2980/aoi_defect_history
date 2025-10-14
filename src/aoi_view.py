@@ -1,20 +1,19 @@
 import tkinter as tk
-from tkinter import messagebox
-from tkinter import filedialog
-from tkinter import simpledialog
-from tkinter import ttk
+from tkinter import messagebox, filedialog, ttk
 from PIL import Image, ImageTk
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 import configparser
 import pandas as pd
+from pandas import DataFrame
 import re
 from typing import List
 import threading
 
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 from .sub_window import SettingsWindow, KintoneSettings
+from .dialog import LotChangeDialog, ChangeUserDialog, ItemCodeChangeDialog
 from pathlib import Path
 from ktec_smt_schedule import SMTSchedule
 
@@ -57,7 +56,8 @@ class AOIView(tk.Toplevel):
         self.init_kintone_client()
 
         # キントーン接続確認（非同期）
-        self.is_kintone_connected_async()
+        self.is_kintone_connected: bool = False
+        self.kintone_connected_async()
 
         # 設定読み込み
         self.__read_settings()
@@ -72,7 +72,9 @@ class AOIView(tk.Toplevel):
         self.create_status_bar()
 
         # SMTスケジュール非同期読み込み開始（ステータスバー作成後）
-        self.read_smt_schedule_async()
+        self.schedule_df: DataFrame = None
+        self.is_read_schedule: bool = False
+        self.__read_smt_schedule_async()
 
         # 現在の座標情報
         self.current_coordinates = None
@@ -87,13 +89,20 @@ class AOIView(tk.Toplevel):
         self.update_board_label()
 
         # 品目コード,指図,画像パス
-        self.current_item_code = None
-        self.current_lot_number = None
-        self.current_image_path = None
-        self.current_image_filename = None
+        self.current_line_name: str = None
+        """生産ライン"""
+        self.current_item_code: str = None
+        """品目コード"""
+        self.current_lot_number: str = None
+        """指図"""
+        self.current_image_path: str = None
+        """画像パス"""
+        self.current_image_filename: str = None
+        """画像ファイル名"""
 
         # ユーザー名
-        self.user_name = None
+        self.user_name: str = None
+        """ユーザー名"""
 
         # ユーザー切り替え
         self.change_user()
@@ -112,22 +121,31 @@ class AOIView(tk.Toplevel):
                 "schedule_directory", ""
             )
 
-    def read_smt_schedule_async(self):
+    def __read_smt_schedule_async(self):
         """SMTスケジュールを非同期で読み込み"""
 
         def _read_schedule():
+            """SMTスケジュールを読み込む"""
             try:
+                # ステータスバーの更新
                 self.after(0, lambda: self.update_smt_status("読み込み中...", "orange"))
                 self.after(
                     0, lambda: self.update_status("SMTスケジュールを読み込み中...")
                 )
-
+                # スケジュール情報の取得
                 if self.schedule_directory:
-                    sc = SMTSchedule.get_lot_infos(self.schedule_directory, 1, 9)
+                    # スケジュール情報のDataFrame取得
+                    self.schedule_df = SMTSchedule.get_lot_infos(
+                        self.schedule_directory, 1, 9
+                    )
+                    # スケジュール情報の読み込み完了
+                    self.is_read_schedule = True
+                    # スケジュール情報のCSVパスを取得
                     output_path = PROJECT_DIR / "smt_schedule.csv"
-                    sc.to_csv(output_path, index=False)
+                    # CSVファイルに出力
+                    self.schedule_df.to_csv(output_path, index=False)
 
-                    # 成功時の処理
+                    # 成功時のステータスバー更新
                     self.after(
                         0, lambda: self.update_smt_status("読み込み完了", "green")
                     )
@@ -137,7 +155,6 @@ class AOIView(tk.Toplevel):
                             "SMTスケジュールの読み込みが完了しました"
                         ),
                     )
-                    print("SMTスケジュールの読み込みが完了しました。")
                 else:
                     # ディレクトリ未設定時
                     self.after(0, lambda: self.update_smt_status("未設定", "gray"))
@@ -171,16 +188,14 @@ class AOIView(tk.Toplevel):
             api_token=kintone_settings.get("api_token"),
         )
 
-    def is_kintone_connected_async(self) -> bool:
+    def kintone_connected_async(self) -> bool:
         """キントーン接続を非同期で確認"""
-        result = {"connected": False}
 
         def _check_connection():
             try:
                 connected = self.kintone_client.is_connected()
-                result["connected"] = connected
+                self.is_kintone_connected = connected
                 status_msg = "キントーン接続済み" if connected else "キントーン未接続"
-                status_color = "green" if connected else "red"
                 self.after(0, lambda: self.update_connection_status(connected))
                 self.after(0, lambda: self.update_status(status_msg))
             except Exception as e:
@@ -194,19 +209,29 @@ class AOIView(tk.Toplevel):
         thread.start()
 
     def create_menu(self):
+        """メニューの作成"""
+
+        # メニューバーの作成
         menubar = tk.Menu(self)
+
+        # ファイルメニュー
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="画像を開く", command=self.open_image)
         menubar.add_cascade(label="ファイル", menu=file_menu)
+        # 設定メニュー
         settings_menu = tk.Menu(menubar, tearoff=0)
         settings_menu.add_command(label="設定", command=self.open_settings)
         menubar.add_cascade(label="設定", menu=settings_menu)
-        help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="不良名一覧", command=self.show_defect_mapping)
-        menubar.add_cascade(label="ヘルプ", menu=help_menu)
+        # キントーン設定メニュー
         kintoneMenu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="キントーン設定", menu=kintoneMenu)
         kintoneMenu.add_command(label="API設定", command=self.open_kintone_settings)
+        # ヘルプメニュー
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="不良名一覧", command=self.show_defect_mapping)
+        menubar.add_cascade(label="ヘルプ", menu=help_menu)
+
+        # メニューバーをウィンドウに設定
         self.config(menu=menubar)
 
     def create_header(self):
@@ -304,6 +329,14 @@ class AOIView(tk.Toplevel):
             command=self.change_user,
         )
         user_change_button.pack(side=tk.LEFT, padx=5, pady=[0, 2])
+
+        # 生産ライン
+        line_label = tk.Label(user_frame, text="生産ライン: ", font=font_label)
+        line_label.pack(side=tk.LEFT, padx=10)
+        self.line_label_value = tk.Entry(
+            user_frame, font=font_value, width=10, justify="center"
+        )
+        self.line_label_value.pack(side=tk.LEFT)
 
         # AOI担当
         aoi_user_label = tk.Label(user_frame, text="AOI担当: ", font=font_label)
@@ -504,7 +537,7 @@ class AOIView(tk.Toplevel):
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
             # defect_listをCSVに保存
-            self.defect_list_to_csv()
+            self.defect_list_to_csv_async()
         self.destroy()
 
     def open_image(self):
@@ -608,6 +641,29 @@ class AOIView(tk.Toplevel):
         # canvasの座標マーカーを削除
         self.canvas.delete("coordinate_marker")
 
+    def defect_list_update(self, index: str, item: DefectInfo):
+        # indexが数値に変換可能か確認
+        if not index.isdigit():
+            messagebox.showerror("Error", "不良番号が不正です。")
+            return
+        index = int(index)
+        self.defect_list[index - 1] = item
+        self.defect_listbox.item(
+            self.defect_listbox.get_children()[index - 1],
+            values=[item.defect_number, item.reference, item.defect_name, ""],
+        )
+        self.defect_number_update()
+        # canvasの座標マーカーを削除
+        self.canvas.delete("coordinate_marker")
+
+    def exists_defect_listbox(self, defect_number: str) -> bool:
+        """defect_listboxに指定された不良番号が存在するか確認"""
+        for item in self.defect_listbox.get_children():
+            values = self.defect_listbox.item(item, "values")
+            if values[0] == defect_number:
+                return True
+        return False
+
     def read_defect_list_csv(self, filepath: str):
         """CSVファイルから不良リストを読み込み、defect_listに設定"""
         try:
@@ -624,7 +680,7 @@ class AOIView(tk.Toplevel):
             raise Exception(e)
 
     def save_defect_info(self):
-        """不良情報をdefect_listに追加し、defect_listboxを更新"""
+        """保存ボタンを押したときの処理"""
 
         # データディレクトリが有効か確認
         if not self.exist_data_directory():
@@ -665,18 +721,9 @@ class AOIView(tk.Toplevel):
             messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
             return
 
-        # defect_listにcurrent_board_indexとdefect_numberが重複する場合は置き換える
-        for idx, item in enumerate(self.defect_list):
-            if (
-                item.current_board_index == current_board_index
-                and item.defect_number == defect_number
-            ):
-                # 既存のアイテムを削除
-                self.defect_list_delete(idx, self.defect_listbox.get_children()[idx])
-                break
-
         # defect_listに追加
         defect = DefectInfo(
+            line_name=self.current_line_name,
             current_board_index=current_board_index,
             defect_number=defect_number,
             reference=rf,
@@ -691,7 +738,11 @@ class AOIView(tk.Toplevel):
             model_label=model_label,
             board_label=board_label,
         )
-        self.defect_list_insert(defect)
+
+        if self.exists_defect_listbox(defect_number):
+            self.defect_list_update(defect_number, defect)
+        else:
+            self.defect_list_insert(defect)
 
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
@@ -701,7 +752,10 @@ class AOIView(tk.Toplevel):
         self.canvas.delete("coordinate_marker")
 
         # self.defect_listをCSVに保存
-        self.defect_list_to_csv()
+        self.defect_list_to_csv_async()
+
+        # キントーンにデータを登録
+        self.post_kintone_record_async(self.defect_list)
 
     def delete_defect_info(self):
         selected_item = self.defect_listbox.selection()
@@ -715,7 +769,7 @@ class AOIView(tk.Toplevel):
             self.defect_list_delete(index, selected_item[0])
             self.rf_entry.delete(0, tk.END)
             self.defect_entry.delete(0, tk.END)
-            self.defect_list_to_csv()
+            self.defect_list_to_csv_async()
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
@@ -817,7 +871,7 @@ class AOIView(tk.Toplevel):
             )
             return
         # 不良リストをCSVに保存
-        self.defect_list_to_csv()
+        self.defect_list_to_csv_async()
         # 画面を更新
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
@@ -832,19 +886,27 @@ class AOIView(tk.Toplevel):
             return False
         return True
 
-    def defect_list_to_csv(self):
-        """defect_listをCSVファイルに保存"""
-        try:
-            file_path = FileManager.create_defect_csv_path(
-                self.data_directory,
-                self.current_lot_number,
-                self.current_image_filename,
-            )
-            FileManager.save_defect_csv(self.defect_list, file_path)
-        except OSError as e:
-            raise OSError(e)
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to save defect list to CSV:\n{e}")
+    def defect_list_to_csv_async(self):
+        """非同期にdefect_listをCSVファイルに保存"""
+
+        def _defect_list_to_csv():
+            try:
+                file_path = FileManager.create_defect_csv_path(
+                    self.data_directory,
+                    self.current_lot_number,
+                    self.current_image_filename,
+                )
+                FileManager.save_defect_csv(self.defect_list, file_path)
+            except OSError as e:
+                raise OSError(e)
+            except Exception as e:
+                messagebox.showerror(
+                    "Error", f"Failed to save defect list to CSV:\n{e}"
+                )
+
+        # 別スレッドで非同期処理
+        thread = threading.Thread(target=_defect_list_to_csv, daemon=True)
+        thread.start()
 
     def update_board_label(self):
         self.board_no_label.config(
@@ -899,8 +961,22 @@ class AOIView(tk.Toplevel):
         else:
             messagebox.showinfo("Info", "設定の変更がキャンセルされました。")
 
+    def __search_schedule_df_item(self, lot_number: str) -> dict:
+        """SMTスケジュールから品目コードを検索"""
+
+        # SMT計画表が読み込まれていない場合はNoneを返す
+        if self.is_read_schedule is False:
+            messagebox.showwarning("Warning", "SMT計画表が読み込まれていません。")
+            return None
+
+        # self.schedule_dfからレコードを抽出して最初のレコードを辞書に変換
+        records = self.schedule_df[self.schedule_df["lot_number"] == lot_number]
+        if records.empty:
+            return None
+        return records.iloc[0].to_dict()
+
     def change_lot(self):
-        """品目コードと指図を変更するダイアログを開く"""
+        """指図変更処理"""
 
         # ユーザーが未設定の場合は警告を表示して終了
         if not self.is_set_user():
@@ -919,34 +995,49 @@ class AOIView(tk.Toplevel):
 
         # defect_listをCSVに保存
         if len(self.defect_list) > 0:
-            self.defect_list_to_csv()
+            self.defect_list_to_csv_async()
 
-        # 品目コードと指図を入力するダイアログを表示
+        # 指図を入力するダイアログを表示
         dialog = LotChangeDialog(self)
         if not hasattr(dialog, "result") or not dialog.result:
-            messagebox.showinfo(
-                "Info", "品目コードと指図の変更がキャンセルされました。"
-            )
+            messagebox.showinfo("Info", "指図の変更がキャンセルされました。")
             return
 
-        self.current_item_code = dialog.result[0].upper()
-        self.current_lot_number = dialog.result[1]
+        # 指図を取得
+        self.current_lot_number = dialog.result
 
+        # 指図形式のバリデーション
         if self.is_validation_lot_name(self.current_lot_number) is False:
             messagebox.showwarning("Warning", "指図の形式が不正です。例: 1234567-10")
             self.current_item_code = None
             self.current_lot_number = None
             return
 
+        # item_code, line_nameを取得する
+        schedule_item = self.__search_schedule_df_item(self.current_lot_number)
+        self.current_item_code = schedule_item.get("model_code")
+        self.current_line_name = schedule_item.get("machine_name")
+
+        # item_codeが見つからなかった場合
+        if not self.current_item_code:
+            # アイテムコード入力ダイアログを表示
+            itemDialog = ItemCodeChangeDialog(self)
+            if not hasattr(itemDialog, "result") or not itemDialog.result:
+                messagebox.showinfo("Info", "品目コードの入力がキャンセルされました。")
+                self.current_item_code = None
+                self.current_lot_number = None
+                return
+            # 入力されたitem_codeを設定
+            self.current_item_code = itemDialog.result.upper()
+
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
-        if self.image_directory and self.current_item_code:
-            for filename in os.listdir(self.image_directory):
-                if filename.startswith(self.current_item_code):
-                    self.current_image_path = os.path.join(
-                        self.image_directory, filename
-                    )
-                    self.open_select_image(self.current_image_path)
-                    break
+        try:
+            filename = FileManager.get_image_path(
+                self.image_directory, self.current_lot_number, self.current_item_code
+            )
+            self.current_image_path = os.path.join(self.image_directory, filename)
+            self.open_select_image(self.current_image_path)
+        except FileNotFoundError as e:
             # 画像が見つからなかった場合
             if not self.current_image_path:
                 self.current_image_path = None
@@ -956,21 +1047,42 @@ class AOIView(tk.Toplevel):
                     "Warning", "指定された品目コードに対応する画像が見つかりません。"
                 )
                 return
+        except ValueError:
+            # ロットナンバーの形式が不正な場合
+            messagebox.showwarning("Warning", "指図の形式が不正です。例: 1234567-10")
+            self.current_item_code = None
+            self.current_lot_number = None
+            return
 
         # 画像名から機種情報を取得
         if self.current_image_path:
             baseName = os.path.basename(self.current_image_path).split(".")[0]
             self.current_image_filename = baseName
-            parts = baseName.split("_")
-            model_name = parts[1] if len(parts) > 1 else ""
-            board_name = parts[2] if len(parts) > 2 else ""
-            side_label = parts[3] if len(parts) > 3 else ""
+            try:
+                parts = FileManager.parse_image_filename(baseName)
+                model_name = parts[0]
+                board_name = parts[1]
+                side_label = parts[2]
+            except ValueError:
+                # 画像名の形式が不正な場合,エラーメッセージを表示
+                messagebox.showwarning(
+                    "Warning",
+                    "画像ファイル名の形式が不正です。正しい設定例: Y8470722R_20_CN-SNDDJ0CJ_411CA_S面.jpg",
+                )
+                return
 
         # 各ラベルを更新
+        self.line_label_value.delete(0, tk.END)
+        self.line_label_value.insert(0, self.current_line_name or "")
         self.model_label_value.config(text=model_name)
         self.board_label_value.config(text=board_name)
         self.side_label_value.config(text=side_label)
         self.lot_label_value.config(text=self.current_lot_number)
+
+        # ステータスバーの更新
+        self.update_status(
+            f"品目コード: {self.current_item_code}、指図: {self.current_lot_number} に変更されました。"
+        )
 
         try:
             # csvパスの取得
@@ -1083,80 +1195,58 @@ class AOIView(tk.Toplevel):
             self.is_kintone_connected_async()
 
     def post_kintone_record_async(self, defect_list: List[DefectInfo]):
-        """不良レコードをKintoneに送信"""
+        """Kintoneにレコードを送信する非同期処理"""
+
+        # キントーンAPIに接続されていない場合は終了
+        if self.is_kintone_connected is False:
+            self.update_status(
+                "キントーンAPIに接続されていない為、レコードの登録が失敗しました。"
+            )
+            return
 
         def _send_request():
+            """Kintoneにレコードを送信する処理"""
             try:
+                # キントーンにレコードを送信
                 updated_defect_list = self.kintone_client.post_defect_records(
                     defect_list
                 )
+                # 送信後のdefect_listを更新
                 self.defect_list = updated_defect_list
-                self.defect_list_to_csv()
+                # defect_listをCSVに保存
+                self.defect_list_to_csv_async()
                 # 成功したらステータスバーを更新
                 count = len(updated_defect_list)
+                # ステータスバーを更新
                 if count > 0:
                     self.update_status("キントーンアプリにレコードを登録しました。")
             except Exception as e:
                 raise ValueError(f"API送信エラー: {e}")
 
+        # 別スレッドで非同期処理
         thread = threading.Thread(target=_send_request)
         thread.start()
 
     def delete_kintone_record_async(self, record_id: str):
         """Kintoneレコードを削除"""
 
+        # キントーンAPIに接続されていない場合は終了
+        if self.is_kintone_connected is False:
+            self.update_status(
+                "キントーンAPIに接続されていない為、レコードの登録が失敗しました。"
+            )
+            return
+
         def _delete_request():
+            """Kintoneレコードを削除する処理"""
             try:
+                # キントーンにレコードを削除
                 self.kintone_client.delete_record(record_id)
+                # 成功したらステータスバーを更新
                 self.update_status("キントーンアプリからレコードを削除しました。")
             except Exception as e:
                 raise ValueError(f"API削除エラー: {e}")
 
+        # 別スレッドで非同期処理
         thread = threading.Thread(target=_delete_request)
         thread.start()
-
-
-class LotChangeDialog(simpledialog.Dialog):
-    def body(self, master):
-        tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(
-            row=0, columnspan=2
-        )
-
-        # 品目コードエントリ
-        tk.Label(master, text="品目コード:").grid(row=1, column=0, sticky="w")
-        self.item_code_entry = tk.Entry(master)
-        self.item_code_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        # 指図エントリ
-        tk.Label(master, text="指図:").grid(row=2, column=0, sticky="w")
-        self.lot_entry = tk.Entry(master)
-        self.lot_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        # Enterキーでlot_entryにフォーカスを移動
-        self.item_code_entry.bind("<Return>", self.on_enter)
-
-        return self.item_code_entry  # 初期フォーカスをエントリに設定
-
-    def apply(self):
-        self.result = self.item_code_entry.get(), self.lot_entry.get()
-
-    def on_enter(self, event):
-        self.lot_entry.focus_set()  # lot_entryにフォーカスを移動
-        return "break"  # イベントの伝播を停止
-
-
-class ChangeUserDialog(simpledialog.Dialog):
-    def body(self, master):
-        tk.Label(master, text="新しいユーザーIDを入力してください。").grid(
-            row=0, columnspan=2
-        )
-
-        # ユーザーエントリ
-        tk.Label(master, text="ユーザーID:").grid(row=1, column=0, sticky="w")
-        self.user_entry = tk.Entry(master)
-        self.user_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        return self.user_entry  # 初期フォーカスをエントリに設定
-
-    def apply(self):
-        self.result = self.user_entry.get()

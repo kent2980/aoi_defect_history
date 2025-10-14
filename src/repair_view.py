@@ -14,8 +14,7 @@ import re
 from dataclasses import asdict
 from typing import List
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
-import requests
-import json
+from .dialog import ChangeUserDialog, LotChangeDialog
 
 PROJECT_DIR = Path(__file__).parent.parent
 
@@ -1016,35 +1015,6 @@ class RepairView(tk.Toplevel):
             raise ValueError(f"API削除エラー: {e}")
 
 
-class LotChangeDialog(simpledialog.Dialog):
-    def body(self, master):
-        tk.Label(master, text="新しい品目コードと指図を入力してください。").grid(
-            row=0, columnspan=2
-        )
-
-        # 品目コードエントリ
-        tk.Label(master, text="品目コード:").grid(row=1, column=0, sticky="w")
-        self.item_code_entry = tk.Entry(master)
-        self.item_code_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        # 指図エントリ
-        tk.Label(master, text="指図:").grid(row=2, column=0, sticky="w")
-        self.lot_entry = tk.Entry(master)
-        self.lot_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        # Enterキーでlot_entryにフォーカスを移動
-        self.item_code_entry.bind("<Return>", self.on_enter)
-
-        return self.item_code_entry  # 初期フォーカスをエントリに設定
-
-    def apply(self):
-        self.result = self.item_code_entry.get(), self.lot_entry.get()
-
-    def on_enter(self, event):
-        self.lot_entry.focus_set()  # lot_entryにフォーカスを移動
-        return "break"  # イベントの伝播を停止
-
-
 class SettingsDialog(simpledialog.Dialog):
 
     def __init__(self, parent):
@@ -1108,20 +1078,3 @@ class SettingsDialog(simpledialog.Dialog):
 
     def apply(self):
         self.result = self.setting1_entry.get(), self.setting2_entry.get()
-
-
-class ChangeUserDialog(simpledialog.Dialog):
-    def body(self, master):
-        tk.Label(master, text="新しいユーザーIDを入力してください。").grid(
-            row=0, columnspan=2
-        )
-
-        # ユーザーエントリ
-        tk.Label(master, text="ユーザーID:").grid(row=1, column=0, sticky="w")
-        self.user_entry = tk.Entry(master)
-        self.user_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        return self.user_entry  # 初期フォーカスをエントリに設定
-
-    def apply(self):
-        self.result = self.user_entry.get()
