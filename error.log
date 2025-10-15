@@ -1,0 +1,8 @@
+アプリケーション開始エラー:
+ModeView.__init__() got an unexpected keyword argument 'master'
+
+Traceback (most recent call last):
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\main.py", line 29, in main
+    mode_view = ModeView(master=root)
+                ^^^^^^^^^^^^^^^^^^^^^
+TypeError: ModeView.__init__() got an unexpected keyword argument 'master'

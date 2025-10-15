@@ -22,14 +22,11 @@ from src import ModeView
 def main():
     """メインエントリーポイント"""
     try:
-        root = tk.Tk()
-        root.withdraw()  # メインウィンドウを非表示
-
-        # モード選択画面を表示
-        mode_view = ModeView(master=root)
+        # モード選択画面を表示（ModeViewがルートウィンドウとして機能）
+        mode_view = ModeView()
 
         # アプリケーション開始
-        root.mainloop()
+        mode_view.mainloop()
 
     except Exception as e:
         import traceback
