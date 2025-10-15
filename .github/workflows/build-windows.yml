@@ -42,7 +42,8 @@ jobs:
         if ("${{ matrix.architecture }}" -eq "x86") {
           uv pip install --only-binary=all pandas numpy
         }
-        uv sync --frozen
+        # テスト依存関係を除外してインストール
+        uv sync --frozen --no-dev
         uv pip install pyinstaller
       shell: powershell
 
@@ -64,7 +65,8 @@ jobs:
           Get-Item "$distDir\$outputName.exe" | Select-Object Name, Length, LastWriteTime
           
           # 配布パッケージの内容確認
-          Write-Host "`nPackage contents:"
+          Write-Host ""
+          Write-Host "Package contents:"
           Get-ChildItem $distDir | Select-Object Name, Length
           
           # フルパッケージとしてZIP作成

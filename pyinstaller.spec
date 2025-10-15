@@ -56,46 +56,84 @@ a = Analysis(
         'aoi_data_manager.api_client',
         'aoi_data_manager.models',
         'ktec_smt_schedule',
-        'json',
-        'datetime',
-        'uuid',
-        'configparser',
-        'threading',
-        'pathlib',
-        'os',
-        're',
-        'dataclasses',
-        'typing',
+        'src.aoi_view',
+        'src.mode_view',
+        'src.repair_view',
+        'src.dialog',
+        'src.sub_window',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # テスト関連モジュールを除外
+        'pytest',
+        '_pytest',
+        'unittest',
+        'test',
+        'tests',
+        # 不要なモジュールを除外
+        'setuptools',
+        'wheel',
+        'pip',
+        'distutils',
+        # 開発ツールを除外
+        'black',
+        'autopep8',
+        'yapf',
+        # ドキュメント生成ツールを除外
+        'pydoc',
+        'doctest',
+        # 不要なパッケージを除外
+        'openpyxl',
+        'yaml',
+        'jinja2',
+        'markupsafe',
+        'colorama',
+        'pygments',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=None,
     noarchive=False,
 )
 
+# 不要なモジュールを手動で除去
+excluded_modules = [
+    'pytest', '_pytest', 'unittest', 'test', 'tests',
+    'setuptools', 'wheel', 'pip', 'distutils',
+    'black', 'autopep8', 'yapf',
+    'pydoc', 'doctest',
+    'openpyxl', 'yaml', 'jinja2', 'markupsafe',
+    'colorama', 'pygments',
+]
+
+# pure pythonモジュールから除外
+a.pure = [item for item in a.pure if not any(excluded in item[0] for excluded in excluded_modules)]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name=output_name,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,  # GUIアプリケーションなのでコンソールを非表示
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # アイコンファイルがあれば指定: 'path/to/icon.ico'
+    icon=None,
 )
 
 # COLLECTを使用してディレクトリ形式でパッケージ作成
@@ -112,7 +150,6 @@ coll = COLLECT(
 
 # ユーザー編集可能ファイルを外部に配置
 import shutil
-import codecs
 dist_dir = project_root / "dist" / output_name
 user_editable_files = ['defect_mapping.csv', 'user.csv']
 
@@ -121,22 +158,11 @@ for filename in user_editable_files:
     if src_file.exists():
         dst_file = dist_dir / filename
         if not dst_file.exists():
-            # UTF-8エンコーディングでファイルを読み込んで書き込み
             try:
                 with open(str(src_file), 'r', encoding='utf-8-sig') as f_src:
                     content = f_src.read()
-                with open(str(dst_file), 'w', encoding='utf-8-sig', newline='') as f_dst:
+                with open(str(dst_file), 'w', encoding='utf-8-sig') as f_dst:
                     f_dst.write(content)
-                print(f"Copied {filename} with UTF-8 BOM encoding")
-            except UnicodeDecodeError:
-                # UTF-8で読み込めない場合はShift_JISで試行
-                try:
-                    with open(str(src_file), 'r', encoding='shift_jis') as f_src:
-                        content = f_src.read()
-                    with open(str(dst_file), 'w', encoding='utf-8-sig', newline='') as f_dst:
-                        f_dst.write(content)
-                    print(f"Copied {filename} with Shift_JIS to UTF-8 BOM encoding")
-                except Exception as e:
-                    print(f"Error copying {filename}: {e}")
-                    # フォールバック: バイナリコピー
-                    shutil.copy2(str(src_file), str(dst_file))
+                print(f"✓ Copied {filename} to distribution directory")
+            except Exception as e:
+                print(f"Warning: Could not copy {filename}: {e}")
