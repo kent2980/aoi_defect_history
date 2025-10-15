@@ -43,24 +43,24 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        uv run pyinstaller --onefile --windowed --name=${{ matrix.output-name }} main.py `
-        --add-data "defect_mapping.csv;." `
-        --add-data "user.csv;." `
-        --add-data "settings.ini;." `
-        --add-data "kintone_settings.ini;." `
-        --hidden-import aoi_data_manager `
-        --hidden-import aoi_data_manager.file_operations `
-        --hidden-import aoi_data_manager.api_client `
-        --hidden-import aoi_data_manager.models `
-        --hidden-import ktec_smt_schedule
+        # Set architecture-specific environment variable for spec file
+        $env:TARGET_ARCH = "${{ matrix.architecture }}"
+        uv run pyinstaller pyinstaller.spec
 
     - name: Test executable exists
       run: |
-        if (Test-Path "dist\${{ matrix.output-name }}.exe") {
+        $outputName = "${{ matrix.output-name }}"
+        if (Test-Path "dist\$outputName\$outputName.exe") {
           Write-Host "Executable built successfully"
-          Get-Item "dist\${{ matrix.output-name }}.exe" | Select-Object Name, Length, LastWriteTime
+          Get-Item "dist\$outputName\$outputName.exe" | Select-Object Name, Length, LastWriteTime
+          Write-Host "Directory contents:"
+          Get-ChildItem "dist\$outputName" | Select-Object Name, Length
         } else {
           Write-Host "Error: Executable not found"
+          Write-Host "Available files in dist:"
+          if (Test-Path "dist") {
+            Get-ChildItem "dist" -Recurse | Select-Object FullName, Length
+          }
           exit 1
         }
       shell: pwsh
@@ -69,7 +69,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.output-name }}
-        path: dist/${{ matrix.output-name }}.exe
+        path: dist/${{ matrix.output-name }}/
         retention-days: 30
 
   create-release:
@@ -83,14 +83,44 @@ jobs:
       with:
         path: ./artifacts
 
+    - name: Prepare release files
+      run: |
+        mkdir -p ./release-files
+        # Copy executables from artifact directories
+        cp ./artifacts/aoi-defect-history-win64/aoi-defect-history-win64.exe ./release-files/
+        cp ./artifacts/aoi-defect-history-win32/aoi-defect-history-win32.exe ./release-files/
+        
+        # Create zip packages with all necessary files
+        cd ./artifacts/aoi-defect-history-win64
+        zip -r ../../release-files/aoi-defect-history-win64-full.zip .
+        cd ../aoi-defect-history-win32
+        zip -r ../../release-files/aoi-defect-history-win32-full.zip .
+        cd ../../
+        
+        ls -la ./release-files/
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./artifacts/aoi-defect-history-win64/aoi-defect-history-win64.exe
-          ./artifacts/aoi-defect-history-win32/aoi-defect-history-win32.exe
+          ./release-files/aoi-defect-history-win64.exe
+          ./release-files/aoi-defect-history-win32.exe
+          ./release-files/aoi-defect-history-win64-full.zip
+          ./release-files/aoi-defect-history-win32-full.zip
         draft: false
         prerelease: false
         generate_release_notes: true
+        body: |
+          ## ダウンロード方法
+          
+          ### 単体実行ファイル
+          - `aoi-defect-history-win64.exe` - 64bit Windows用実行ファイル
+          - `aoi-defect-history-win32.exe` - 32bit Windows用実行ファイル
+          
+          ### フルパッケージ（推奨）
+          - `aoi-defect-history-win64-full.zip` - 64bit用フルパッケージ（実行ファイル + CSV設定ファイル）
+          - `aoi-defect-history-win32-full.zip` - 32bit用フルパッケージ（実行ファイル + CSV設定ファイル）
+          
+          **注意**: フルパッケージには編集可能なCSVファイル（defect_mapping.csv、user.csv）が含まれています。
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

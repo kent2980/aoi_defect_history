@@ -144,7 +144,7 @@ class AOIView(tk.Toplevel):
                     # スケジュール情報のCSVパスを取得
                     output_path = PROJECT_DIR / "smt_schedule.csv"
                     # CSVファイルに出力
-                    self.schedule_df.to_csv(output_path, index=False)
+                    self.schedule_df.to_csv(output_path, index=False, encoding="utf-8")
 
                     # 成功時のステータスバー更新
                     self.after(
@@ -1175,7 +1175,7 @@ class AOIView(tk.Toplevel):
             raise FileNotFoundError(
                 f"defect_mapping.csv not found at {mapping_csv_path}"
             )
-        df = pd.read_csv(mapping_csv_path)
+        df = pd.read_csv(mapping_csv_path, encoding="utf-8")
         df = df.dropna()
         # dfのno列をfloatだった場合にintに変換
         df["no"] = df["no"].apply(

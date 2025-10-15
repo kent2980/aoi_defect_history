@@ -12,7 +12,15 @@ except NameError:
     project_root = Path(os.getcwd())
 
 # アーキテクチャの判定
-arch = 'win64' if sys.maxsize > 2**32 else 'win32'
+# GitHub Actionsから環境変数を取得、なければシステムから判定
+target_arch = os.environ.get('TARGET_ARCH')
+if target_arch == 'x64':
+    arch = 'win64'
+elif target_arch == 'x86':
+    arch = 'win32'
+else:
+    # ローカルビルド時はシステムから判定
+    arch = 'win64' if sys.maxsize > 2**32 else 'win32'
 output_name = f'aoi-defect-history-{arch}'
 
 # データファイルの設定（実行ファイルに埋め込むもの）
@@ -104,6 +112,7 @@ coll = COLLECT(
 
 # ユーザー編集可能ファイルを外部に配置
 import shutil
+import codecs
 dist_dir = project_root / "dist" / output_name
 user_editable_files = ['defect_mapping.csv', 'user.csv']
 
@@ -112,4 +121,22 @@ for filename in user_editable_files:
     if src_file.exists():
         dst_file = dist_dir / filename
         if not dst_file.exists():
-            shutil.copy2(str(src_file), str(dst_file))
+            # UTF-8エンコーディングでファイルを読み込んで書き込み
+            try:
+                with open(str(src_file), 'r', encoding='utf-8') as f_src:
+                    content = f_src.read()
+                with open(str(dst_file), 'w', encoding='utf-8', newline='') as f_dst:
+                    f_dst.write(content)
+                print(f"Copied {filename} with UTF-8 encoding")
+            except UnicodeDecodeError:
+                # UTF-8で読み込めない場合はShift_JISで試行
+                try:
+                    with open(str(src_file), 'r', encoding='shift_jis') as f_src:
+                        content = f_src.read()
+                    with open(str(dst_file), 'w', encoding='utf-8', newline='') as f_dst:
+                        f_dst.write(content)
+                    print(f"Copied {filename} with Shift_JIS to UTF-8 encoding")
+                except Exception as e:
+                    print(f"Error copying {filename}: {e}")
+                    # フォールバック: バイナリコピー
+                    shutil.copy2(str(src_file), str(dst_file))
