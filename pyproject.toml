@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "aoi-data-manager",
     "autopep8>=2.3.2",
     "black>=25.9.0",
     "ktec-smt-schedule",
@@ -13,8 +12,15 @@ dependencies = [
     "pillow>=11.3.0",
     "requests>=2.32.5",
     "yapf>=0.43.0",
+    "pyinstaller>=6.0.0",
+    "aoi-data-manager",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0.0",
 ]
 
 [tool.uv.sources]
-aoi-data-manager = { path = "../aoi_data_manager" }
-ktec-smt-schedule = { path = "../ktec_smt_schedule" }
+ktec-smt-schedule = { git = "https://github.com/kent2980/ktec_smt_schedule.git" }
+aoi-data-manager = { git = "https://github.com/kent2980/aoi_data_manager.git" }
