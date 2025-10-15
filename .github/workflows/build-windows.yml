@@ -38,38 +38,66 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv sync
+        # 32bit環境では事前ビルド済みホイールを使用
+        if ("${{ matrix.architecture }}" -eq "x86") {
+          uv pip install --only-binary=all pandas numpy
+        }
+        uv sync --frozen
         uv pip install pyinstaller
+      shell: powershell
 
     - name: Build executable with PyInstaller
       run: |
-        # Set architecture-specific environment variable for spec file
         $env:TARGET_ARCH = "${{ matrix.architecture }}"
         uv run pyinstaller pyinstaller.spec
+      shell: powershell
 
-    - name: Test executable exists
+    - name: Verify build and create package
       run: |
         $outputName = "${{ matrix.output-name }}"
-        if (Test-Path "dist\$outputName\$outputName.exe") {
-          Write-Host "Executable built successfully"
-          Get-Item "dist\$outputName\$outputName.exe" | Select-Object Name, Length, LastWriteTime
-          Write-Host "Directory contents:"
-          Get-ChildItem "dist\$outputName" | Select-Object Name, Length
+        $distDir = "dist\$outputName"
+        
+        if (Test-Path "$distDir\$outputName.exe") {
+          Write-Host "✓ Executable built successfully"
+          
+          # 実行ファイルの情報表示
+          Get-Item "$distDir\$outputName.exe" | Select-Object Name, Length, LastWriteTime
+          
+          # 配布パッケージの内容確認
+          Write-Host "`nPackage contents:"
+          Get-ChildItem $distDir | Select-Object Name, Length
+          
+          # フルパッケージとしてZIP作成
+          $zipPath = "dist\$outputName-full.zip"
+          Compress-Archive -Path $distDir -DestinationPath $zipPath
+          Write-Host "✓ Created full package: $zipPath"
+          
+          # 実行ファイルのみもコピー（後方互換性）
+          Copy-Item "$distDir\$outputName.exe" "dist\$outputName.exe"
+          Write-Host "✓ Created standalone executable: dist\$outputName.exe"
+          
         } else {
-          Write-Host "Error: Executable not found"
-          Write-Host "Available files in dist:"
+          Write-Host "❌ Build failed - executable not found"
           if (Test-Path "dist") {
+            Write-Host "Available files in dist:"
             Get-ChildItem "dist" -Recurse | Select-Object FullName, Length
           }
           exit 1
         }
-      shell: pwsh
+      shell: powershell
 
-    - name: Upload artifacts
+    - name: Upload full package (recommended)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.output-name }}-full
+        path: dist/${{ matrix.output-name }}-full.zip
+        retention-days: 30
+
+    - name: Upload standalone executable
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.output-name }}
-        path: dist/${{ matrix.output-name }}/
+        path: dist/${{ matrix.output-name }}.exe
         retention-days: 30
 
   create-release:
@@ -90,12 +118,9 @@ jobs:
         cp ./artifacts/aoi-defect-history-win64/aoi-defect-history-win64.exe ./release-files/
         cp ./artifacts/aoi-defect-history-win32/aoi-defect-history-win32.exe ./release-files/
         
-        # Create zip packages with all necessary files
-        cd ./artifacts/aoi-defect-history-win64
-        zip -r ../../release-files/aoi-defect-history-win64-full.zip .
-        cd ../aoi-defect-history-win32
-        zip -r ../../release-files/aoi-defect-history-win32-full.zip .
-        cd ../../
+        # Copy full packages
+        cp ./artifacts/aoi-defect-history-win64-full/aoi-defect-history-win64-full.zip ./release-files/
+        cp ./artifacts/aoi-defect-history-win32-full/aoi-defect-history-win32-full.zip ./release-files/
         
         ls -la ./release-files/
 
@@ -111,8 +136,8 @@ jobs:
         prerelease: false
         generate_release_notes: true
         body: |
-          ## ダウンロード方法
-          
+          ## ダウンロード
+
           ### 単体実行ファイル
           - `aoi-defect-history-win64.exe` - 64bit Windows用実行ファイル
           - `aoi-defect-history-win32.exe` - 32bit Windows用実行ファイル

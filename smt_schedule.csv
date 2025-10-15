@@ -1,4 +1,4 @@
-machine_name,model_name,board_name,lot_number,model_code,default_date,volume,rest_volume,line_code,productions,divisions_volume
+﻿machine_name,model_name,board_name,lot_number,model_code,default_date,volume,rest_volume,line_code,productions,divisions_volume
 GC01,VCB-NPB2F,DCP-133Z集合,1198827-10,Y8470696RA,2025-10-02,2000.0,0,GC17,"{datetime.datetime(2025, 10, 2, 0, 0): 2000}",20
 GC01,VCB-NPB2F,DCP-133Z集合,1198829-10,Y8470696RA,2025-10-02,3000.0,0,GC17,"{datetime.datetime(2025, 10, 2, 0, 0): 3000}",20
 GC01,VCB-NPB2F,DCP-133Z集合,1198023-20,Y8470696RA,2025-09-25,6000.0,0,GC17,"{datetime.datetime(2025, 10, 2, 0, 0): 40}",20

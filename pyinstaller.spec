@@ -123,19 +123,19 @@ for filename in user_editable_files:
         if not dst_file.exists():
             # UTF-8エンコーディングでファイルを読み込んで書き込み
             try:
-                with open(str(src_file), 'r', encoding='utf-8') as f_src:
+                with open(str(src_file), 'r', encoding='utf-8-sig') as f_src:
                     content = f_src.read()
-                with open(str(dst_file), 'w', encoding='utf-8', newline='') as f_dst:
+                with open(str(dst_file), 'w', encoding='utf-8-sig', newline='') as f_dst:
                     f_dst.write(content)
-                print(f"Copied {filename} with UTF-8 encoding")
+                print(f"Copied {filename} with UTF-8 BOM encoding")
             except UnicodeDecodeError:
                 # UTF-8で読み込めない場合はShift_JISで試行
                 try:
                     with open(str(src_file), 'r', encoding='shift_jis') as f_src:
                         content = f_src.read()
-                    with open(str(dst_file), 'w', encoding='utf-8', newline='') as f_dst:
+                    with open(str(dst_file), 'w', encoding='utf-8-sig', newline='') as f_dst:
                         f_dst.write(content)
-                    print(f"Copied {filename} with Shift_JIS to UTF-8 encoding")
+                    print(f"Copied {filename} with Shift_JIS to UTF-8 BOM encoding")
                 except Exception as e:
                     print(f"Error copying {filename}: {e}")
                     # フォールバック: バイナリコピー

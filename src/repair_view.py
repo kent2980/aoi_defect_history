@@ -823,7 +823,7 @@ class RepairView(tk.Toplevel):
         user_csv_path = get_csv_file_path("user.csv")
         if not user_csv_path.exists():
             raise FileNotFoundError(f"user.csv not found at {user_csv_path}")
-        df = pd.read_csv(user_csv_path, encoding="utf-8")
+        df = pd.read_csv(user_csv_path, encoding="utf-8-sig")
         user_ids = df["id"].tolist()
         # user_ids内の要素を文字列に変換
         user_ids = [str(uid) for uid in user_ids]
@@ -861,7 +861,7 @@ class RepairView(tk.Toplevel):
             raise FileNotFoundError(
                 f"defect_mapping.csv not found at {mapping_csv_path}"
             )
-        df = pd.read_csv(mapping_csv_path, encoding="utf-8")
+        df = pd.read_csv(mapping_csv_path, encoding="utf-8-sig")
         # defect_numberがdfの'alias'列に存在するか確認
         if defect_number in df["no"].values:
             # 対応する'name'列の値を取得してエントリに設定
@@ -876,7 +876,7 @@ class RepairView(tk.Toplevel):
             raise FileNotFoundError(
                 f"defect_mapping.csv not found at {mapping_csv_path}"
             )
-        df = pd.read_csv(mapping_csv_path, encoding="utf-8")
+        df = pd.read_csv(mapping_csv_path, encoding="utf-8-sig")
         df = df.dropna()
         # dfのno列をfloatだった場合にintに変換
         df["no"] = df["no"].apply(
