@@ -26,35 +26,33 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aoi-data-manager" },
-    { name = "autopep8" },
-    { name = "black" },
     { name = "ktec-smt-schedule" },
     { name = "pandas" },
     { name = "pillow" },
-    { name = "pyinstaller" },
     { name = "requests" },
-    { name = "yapf" },
 ]
 
 [package.optional-dependencies]
-build = [
+dev = [
+    { name = "autopep8" },
+    { name = "black" },
     { name = "pyinstaller" },
+    { name = "yapf" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aoi-data-manager", git = "https://github.com/kent2980/aoi_data_manager.git" },
-    { name = "autopep8", specifier = ">=2.3.2" },
-    { name = "black", specifier = ">=25.9.0" },
+    { name = "autopep8", marker = "extra == 'dev'", specifier = ">=2.3.2" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=25.9.0" },
     { name = "ktec-smt-schedule", git = "https://github.com/kent2980/ktec_smt_schedule.git" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pillow", specifier = ">=11.3.0" },
-    { name = "pyinstaller", specifier = ">=6.0.0" },
-    { name = "pyinstaller", marker = "extra == 'build'", specifier = ">=6.0.0" },
+    { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "requests", specifier = ">=2.32.5" },
-    { name = "yapf", specifier = ">=0.43.0" },
+    { name = "yapf", marker = "extra == 'dev'", specifier = ">=0.43.0" },
 ]
-provides-extras = ["build"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "arrow"

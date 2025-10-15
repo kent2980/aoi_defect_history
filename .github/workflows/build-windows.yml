@@ -71,6 +71,7 @@ jobs:
           
           # フルパッケージとしてZIP作成
           $zipPath = "dist\$outputName-full.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath }
           Compress-Archive -Path $distDir -DestinationPath $zipPath
           Write-Host "✓ Created full package: $zipPath"
           
