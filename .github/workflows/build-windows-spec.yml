@@ -41,9 +41,19 @@ jobs:
         uv sync
         uv pip install pyinstaller
 
+    - name: Debug environment
+      run: |
+        Write-Host "Current directory: $(Get-Location)"
+        Write-Host "Python version: $(python --version)"
+        Write-Host "PyInstaller version: $(uv run pyinstaller --version)"
+        Write-Host "Files in current directory:"
+        Get-ChildItem -Name
+      shell: pwsh
+
     - name: Build executable with spec file
       run: |
         uv run pyinstaller pyinstaller.spec
+      continue-on-error: false
 
     - name: Rename executable to match architecture
       run: |

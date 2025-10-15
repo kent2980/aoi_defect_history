@@ -15,8 +15,9 @@ from dataclasses import asdict
 from typing import List
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 from .dialog import ChangeUserDialog, LotChangeDialog
+from .utils import get_project_dir, get_csv_file_path, get_config_file_path
 
-PROJECT_DIR = Path(__file__).parent.parent
+PROJECT_DIR = get_project_dir()
 
 
 class RepairView(tk.Toplevel):
@@ -81,7 +82,7 @@ class RepairView(tk.Toplevel):
 
     def __read_settings(self):
         """ """
-        settings_path = PROJECT_DIR / "settings.ini"
+        settings_path = get_config_file_path("settings.ini")
         if settings_path.exists():
             # 設定ファイルを読み込み
             config = configparser.ConfigParser()
@@ -641,14 +642,14 @@ class RepairView(tk.Toplevel):
         """設定ダイアログを開く"""
         dialog = SettingsDialog(self)
         new_settings = dialog.result
-        project_dir = PROJECT_DIR
+        project_dir = get_project_dir()
         print(f"[DEBUG] Project Directory: {project_dir}")
         if new_settings:
             # 新しい設定を適用
             self.image_directory = new_settings[0]
             self.data_directory = new_settings[1]
             # 設定ファイルが存在しない場合は新規作成
-            settings_path = project_dir / "settings.ini"
+            settings_path = get_config_file_path("settings.ini")
             if not settings_path.exists():
                 # 新しい設定を保存
                 config = configparser.ConfigParser()
@@ -819,7 +820,7 @@ class RepairView(tk.Toplevel):
         user_id = dialog.result.upper()
 
         # user.csvをDataFrameで読み込み
-        user_csv_path = PROJECT_DIR / "user.csv"
+        user_csv_path = get_csv_file_path("user.csv")
         if not user_csv_path.exists():
             raise FileNotFoundError(f"user.csv not found at {user_csv_path}")
         df = pd.read_csv(user_csv_path)
@@ -855,7 +856,7 @@ class RepairView(tk.Toplevel):
             return
         defect_number = int(defect_number)
         # defect_mapping.csvをDataFrameで読み込み
-        mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
+        mapping_csv_path = get_csv_file_path("defect_mapping.csv")
         if not mapping_csv_path.exists():
             raise FileNotFoundError(
                 f"defect_mapping.csv not found at {mapping_csv_path}"
@@ -870,7 +871,7 @@ class RepairView(tk.Toplevel):
 
     def show_defect_mapping(self):
         """不良名一覧を表示する"""
-        mapping_csv_path = PROJECT_DIR / "defect_mapping.csv"
+        mapping_csv_path = get_csv_file_path("defect_mapping.csv")
         if not mapping_csv_path.exists():
             raise FileNotFoundError(
                 f"defect_mapping.csv not found at {mapping_csv_path}"
@@ -1022,8 +1023,8 @@ class SettingsDialog(simpledialog.Dialog):
         super().__init__(parent, title="設定")
 
     def __read_settings(self):
-        project_dir = PROJECT_DIR
-        settings_path = project_dir / "settings.ini"
+        project_dir = get_project_dir()
+        settings_path = get_config_file_path("settings.ini")
         if settings_path.exists():
             config = configparser.ConfigParser()
             config.read(settings_path, encoding="utf-8")

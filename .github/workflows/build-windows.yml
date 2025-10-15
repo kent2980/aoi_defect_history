@@ -43,7 +43,16 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        uv run pyinstaller --onefile --windowed --name=${{ matrix.output-name }} main.py
+        uv run pyinstaller --onefile --windowed --name=${{ matrix.output-name }} main.py `
+        --add-data "defect_mapping.csv;." `
+        --add-data "user.csv;." `
+        --add-data "settings.ini;." `
+        --add-data "kintone_settings.ini;." `
+        --hidden-import aoi_data_manager `
+        --hidden-import aoi_data_manager.file_operations `
+        --hidden-import aoi_data_manager.api_client `
+        --hidden-import aoi_data_manager.models `
+        --hidden-import ktec_smt_schedule
 
     - name: Test executable exists
       run: |

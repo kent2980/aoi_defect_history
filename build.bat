@@ -15,18 +15,17 @@ rem クリーンビルド
 echo 以前のビルドファイルを削除中...
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
-if exist "*.spec" del "*.spec"
 
-rem PyInstallerでビルド
+rem PyInstallerでビルド (specファイル使用)
 echo ビルド中...
-uv run pyinstaller --onefile --windowed --name=aoi-defect-history main.py
+uv run pyinstaller pyinstaller.spec
 
 rem 結果確認
-if exist "dist\aoi-defect-history.exe" (
+if exist "dist\aoi-defect-history-win64.exe" (
     echo.
     echo ✓ ビルド成功！
-    echo 実行ファイル: dist\aoi-defect-history.exe
-    dir "dist\aoi-defect-history.exe"
+    echo 実行ファイル: dist\aoi-defect-history-win64.exe
+    dir "dist\aoi-defect-history-win64.exe"
 ) else (
     echo.
     echo ✗ ビルド失敗

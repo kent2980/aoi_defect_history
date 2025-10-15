@@ -14,10 +14,11 @@ import threading
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 from .sub_window import SettingsWindow, KintoneSettings
 from .dialog import LotChangeDialog, ChangeUserDialog, ItemCodeChangeDialog
+from .utils import get_project_dir, get_csv_file_path, get_config_file_path
 from pathlib import Path
 from ktec_smt_schedule import SMTSchedule
 
-PROJECT_DIR = Path(__file__).parent.parent
+PROJECT_DIR = get_project_dir()
 
 
 class AOIView(tk.Toplevel):
@@ -109,7 +110,7 @@ class AOIView(tk.Toplevel):
 
     def __read_settings(self):
         """ """
-        settings_path = PROJECT_DIR / "settings.ini"
+        settings_path = get_config_file_path("settings.ini")
         if settings_path.exists():
             # 設定ファイルを読み込み
             config = configparser.ConfigParser()
@@ -178,7 +179,7 @@ class AOIView(tk.Toplevel):
 
     def init_kintone_client(self):
         """キントーンクライアントの初期化"""
-        kintone_settings_path = PROJECT_DIR / "kintone_settings.ini"
+        kintone_settings_path = get_config_file_path("kintone_settings.ini")
         kintone_settings = FileManager.load_kintone_settings_file(
             kintone_settings_path.as_posix()
         )
@@ -926,14 +927,14 @@ class AOIView(tk.Toplevel):
         dialog = SettingsWindow(self)
         self.wait_window(dialog)  # ダイアログが閉じるまで待機
         new_settings = dialog.result
-        project_dir = PROJECT_DIR
+        project_dir = get_project_dir()
         if new_settings:
             # 新しい設定を適用
             self.image_directory = new_settings[0]
             self.data_directory = new_settings[1]
             self.schedule_directory = new_settings[2]
             # 設定ファイルが存在しない場合は新規作成
-            settings_path = project_dir / "settings.ini"
+            settings_path = get_config_file_path("settings.ini")
             if not settings_path.exists():
                 # 新しい設定を保存
                 config = configparser.ConfigParser()
@@ -1124,7 +1125,7 @@ class AOIView(tk.Toplevel):
             return
 
         user_id = dialog.result.upper()
-        user_csv_path = PROJECT_DIR / "user.csv"
+        user_csv_path = get_csv_file_path("user.csv")
 
         try:
             df = FileManager.read_user_csv(str(user_csv_path))
