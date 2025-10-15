@@ -50,7 +50,7 @@ jobs:
     - name: Build executable with PyInstaller
       run: |
         $env:TARGET_ARCH = "${{ matrix.architecture }}"
-        uv run pyinstaller pyinstaller.spec
+        uv run pyinstaller --noconfirm pyinstaller.spec
       shell: powershell
 
     - name: Verify build and create package
