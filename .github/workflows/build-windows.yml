@@ -47,6 +47,18 @@ jobs:
         uv pip install pyinstaller
       shell: powershell
 
+    - name: Clean build directory
+      run: |
+        if (Test-Path "dist") {
+          Remove-Item -Recurse -Force "dist"
+          Write-Host "✓ Cleaned dist directory"
+        }
+        if (Test-Path "build") {
+          Remove-Item -Recurse -Force "build"
+          Write-Host "✓ Cleaned build directory"
+        }
+      shell: powershell
+
     - name: Build executable with PyInstaller
       run: |
         $env:TARGET_ARCH = "${{ matrix.architecture }}"
