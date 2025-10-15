@@ -65,40 +65,33 @@ jobs:
         uv run pyinstaller --noconfirm pyinstaller.spec
       shell: powershell
 
-    - name: Verify build and create package
+    - name: Verify build
       run: |
         $outputName = "${{ matrix.output-name }}"
         $distDir = "dist\$outputName"
+        $exePath = "$distDir\$outputName.exe"
         
-        if (Test-Path "$distDir\$outputName.exe") {
-          Write-Host "✓ Executable built successfully"
-          
-          # 実行ファイルの情報表示
-          Get-Item "$distDir\$outputName.exe" | Select-Object Name, Length, LastWriteTime
-          
-          # 配布パッケージの内容確認
-          Write-Host ""
-          Write-Host "Package contents:"
+        if (Test-Path $exePath) {
+          Write-Host "Build successful"
+          Get-Item $exePath | Select-Object Name, Length, LastWriteTime
           Get-ChildItem $distDir | Select-Object Name, Length
-          
-          # フルパッケージとしてZIP作成
-          $zipPath = "dist\$outputName-full.zip"
-          if (Test-Path $zipPath) { Remove-Item $zipPath }
-          Compress-Archive -Path $distDir -DestinationPath $zipPath
-          Write-Host "✓ Created full package: $zipPath"
-          
-          # 実行ファイルのみもコピー（後方互換性）
-          Copy-Item "$distDir\$outputName.exe" "dist\$outputName.exe"
-          Write-Host "✓ Created standalone executable: dist\$outputName.exe"
-          
         } else {
-          Write-Host "❌ Build failed - executable not found"
-          if (Test-Path "dist") {
-            Write-Host "Available files in dist:"
-            Get-ChildItem "dist" -Recurse | Select-Object FullName, Length
-          }
+          Write-Host "Build failed"
           exit 1
         }
+      shell: powershell
+
+    - name: Create packages
+      run: |
+        $outputName = "${{ matrix.output-name }}"
+        $distDir = "dist\$outputName"
+        $zipPath = "dist\$outputName-full.zip"
+        
+        if (Test-Path $zipPath) { Remove-Item $zipPath }
+        Compress-Archive -Path $distDir -DestinationPath $zipPath
+        Copy-Item "$distDir\$outputName.exe" "dist\$outputName.exe"
+        
+        Write-Host "Packages created successfully"
       shell: powershell
 
     - name: Upload full package (recommended)
