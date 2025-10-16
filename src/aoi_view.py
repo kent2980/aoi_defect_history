@@ -42,26 +42,96 @@ class AOIView(tk.Toplevel):
         self.state("zoomed")  # ウィンドウを最大化
         self.configure(bg="white")  # 背景色を白に設定
 
+        # ウィンドウの最小サイズを設定
+        self.minsize(1200, 800)  # 最小幅1200px、最小高さ800px
+
         # 閉じるボタン押下時の処理を設定
         self.protocol("WM_DELETE_WINDOW", self.before_close)
 
+        # ウィンドウリサイズイベントをバインド
+        self.bind("<Configure>", self.on_window_resize)
+
         # 座標の塗りつぶし色
         self.fillColor = fillColor
+
+        # 画像の実際のサイズを保持
+        self.original_image_size = None  # (width, height)
+        self.displayed_image_size = None  # (width, height)
+        self.image_offset = None  # (x_offset, y_offset)
 
         # ディレクトリ設定
         self.image_directory = None  # 画像ディレクトリ
         self.data_directory = None  # データディレクトリ
         self.schedule_directory = None  # 計画書ディレクトリ
 
+        # Kintone関連
+        self.kintone_client = None  # Kintoneクライアント
+        self.is_kintone_connected: bool = False
+
+        # SMTスケジュール関連
+        self.schedule_df: DataFrame = None
+        self.is_read_schedule: bool = False
+
+        # UI要素の宣言
+        self.serial_entry = None
+        self.model_label_value = None
+        self.board_label_value = None
+        self.side_label_value = None
+        self.lot_label_value = None
+        self.line_label_value = None
+        self.aoi_user_label_value = None
+        self.repair_user_label_value = None
+        self.inspect_user_label_value = None
+        self.info_frame = None
+        self.defect_info_frame = None
+        self.no_value = None
+        self.rf_entry = None
+        self.defect_entry = None
+        self.board_no_label = None
+        self.widgets_frame = None
+        self.canvas = None
+        self.defect_list_frame = None
+        self.defect_listbox = None
+        self.status_frame = None
+        self.status_label = None
+        self.status_right_frame = None
+        self.smt_status_label = None
+        self.connection_label = None
+        self.photo_image = None
+
+        # 画像とプロジェクト関連
+        self.current_coordinates = None
+        self.current_line_name: str = None
+        self.current_item_code: str = None
+        self.current_lot_number: str = None
+        self.current_image_path: str = None
+        self.current_image_filename: str = None
+        self.user_name: str = None
+
+        # データリスト
+        self.defect_list: List[DefectInfo] = []
+        self.repaird_list: List[RepairdInfo] = []
+
+        # 基板番号
+        self.current_board_index = 1
+        self.total_boards = 1
+
+        # 内部制御変数
+        self._update_scheduled = None
+
+        # 設定読み込み
+        self.__read_settings()
+
+        # UIの作成
+        self.create_ui()
+
+    def create_ui(self):
+        """UI要素を作成する"""
         # Kintoneクライアントの初期化
         self.init_kintone_client()
 
         # キントーン接続確認（非同期）
-        self.is_kintone_connected: bool = False
         self.kintone_connected_async()
-
-        # 設定読み込み
-        self.__read_settings()
 
         # UI描画
         self.create_menu()
@@ -73,37 +143,10 @@ class AOIView(tk.Toplevel):
         self.create_status_bar()
 
         # SMTスケジュール非同期読み込み開始（ステータスバー作成後）
-        self.schedule_df: DataFrame = None
-        self.is_read_schedule: bool = False
         self.__read_smt_schedule_async()
 
-        # 現在の座標情報
-        self.current_coordinates = None
-
-        # 不具合リスト
-        self.defect_list: List[DefectInfo] = []
-        self.repaird_list: List[RepairdInfo] = []
-
-        # 基板番号
-        self.current_board_index = 1
-        self.total_boards = 1
+        # 基板ラベルの初期化
         self.update_board_label()
-
-        # 品目コード,指図,画像パス
-        self.current_line_name: str = None
-        """生産ライン"""
-        self.current_item_code: str = None
-        """品目コード"""
-        self.current_lot_number: str = None
-        """指図"""
-        self.current_image_path: str = None
-        """画像パス"""
-        self.current_image_filename: str = None
-        """画像ファイル名"""
-
-        # ユーザー名
-        self.user_name: str = None
-        """ユーザー名"""
 
         # ユーザー切り替え
         self.change_user()
@@ -238,9 +281,10 @@ class AOIView(tk.Toplevel):
         self.config(menu=menubar)
 
     def create_header(self):
-        # ヘッダーフレーム
-        header_frame = tk.Frame(self, height=50)
-        header_frame.pack(fill=tk.X, pady=10)
+        # ヘッダーフレーム - 固定高さで上部に配置
+        header_frame = tk.Frame(self, height=80)  # 高さを80pxに調整
+        header_frame.pack(fill=tk.X, pady=5)  # 上下パディングを削減
+        header_frame.pack_propagate(False)  # 高さ固定
 
         # フォント（Yu Gothic UI, Meiryo, Segoe UI）
         font_title = ("Yu Gothic UI", 16, "bold")
@@ -368,7 +412,8 @@ class AOIView(tk.Toplevel):
     def create_defect_info_area(self):
 
         self.info_frame = tk.Frame(self)
-        self.info_frame.pack(fill=tk.X, padx=10, pady=5)
+        # 固定高さで配置
+        self.info_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
 
         # 不良情報入力フレーム
         self.defect_info_frame = tk.LabelFrame(
@@ -452,28 +497,38 @@ class AOIView(tk.Toplevel):
 
     def create_widgets_area(self):
         self.widgets_frame = tk.Frame(self)
-        self.widgets_frame.pack(fill=tk.X, expand=True, padx=10)
+        # fill=tk.BOTHとexpand=Trueでフレーム全体を使用可能領域に拡張
+        self.widgets_frame.pack(fill=tk.BOTH, expand=True, padx=10)
 
     def create_canvas_widgets(self):
-        self.canvas = tk.Canvas(self.widgets_frame, bg="white", width=900, height=450)
-        self.canvas.pack(side=tk.LEFT, expand=True)
+        # 固定サイズを削除し、可変サイズに変更
+        self.canvas = tk.Canvas(self.widgets_frame, bg="white")
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
         # 左クリック処理をバインド
         self.canvas.bind("<Button-1>", self.on_canvas_click)
 
+        # Canvasサイズ変更イベントをバインド
+        self.canvas.bind("<Configure>", self.on_canvas_resize)
+
     def create_defect_list_widgets(self):
         self.defect_list_frame = tk.Frame(self.widgets_frame)
-        self.defect_list_frame.pack(
-            side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10
-        )
+        # 固定幅を削除し、最小幅を設定
+        self.defect_list_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
+
+        # フレームの最小幅を設定
+        self.defect_list_frame.config(width=350)
+        self.defect_list_frame.pack_propagate(False)  # サイズ固定
+
         # Treeviewの作成
         columns = ("No", "RF", "不良項目", "修理")
         self.defect_listbox = ttk.Treeview(
             self.defect_list_frame, columns=columns, show="headings"
         )
-        col_widths = {"No": 10, "RF": 30, "不良項目": 90, "修理": 10}
+        col_widths = {"No": 40, "RF": 80, "不良項目": 150, "修理": 40}
         for col in columns:
             self.defect_listbox.heading(col, text=col)
             self.defect_listbox.column(col, width=col_widths[col], anchor="center")
+
         # TreeviewとScrollbarをFrame内で横並びに配置
         self.defect_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar = ttk.Scrollbar(
@@ -543,6 +598,80 @@ class AOIView(tk.Toplevel):
             self.defect_list_to_csv_async()
         self.destroy()
 
+    def on_window_resize(self, event):
+        """ウィンドウリサイズ時の処理"""
+        # self以外のウィジェットのConfigureイベントは無視
+        if event.widget != self:
+            return
+
+        # Canvas内に画像がある場合は再描画
+        if hasattr(self, "current_image_path") and self.current_image_path:
+            # 少し遅延させて処理（連続リサイズ時の負荷軽減）
+            self.after(100, self._delayed_image_update)
+
+    def on_canvas_resize(self, event):
+        """Canvasリサイズ時の処理"""
+        # Canvas内に画像がある場合は再描画
+        if hasattr(self, "current_image_path") and self.current_image_path:
+            # 少し遅延させて処理（連続リサイズ時の負荷軽減）
+            self.after(100, self._delayed_image_update)
+
+    def _delayed_image_update(self):
+        """遅延画像更新処理（連続呼び出し防止）"""
+        if hasattr(self, "_update_scheduled"):
+            return
+
+        self._update_scheduled = True
+
+        def _update():
+            try:
+                if hasattr(self, "current_image_path") and self.current_image_path:
+                    self.open_select_image(self.current_image_path)
+            finally:
+                if hasattr(self, "_update_scheduled"):
+                    delattr(self, "_update_scheduled")
+
+        self.after(50, _update)
+
+    def canvas_to_relative_coords(self, canvas_x: int, canvas_y: int) -> tuple:
+        """Canvas座標を画像の相対座標（0.0～1.0）に変換"""
+        if not self.displayed_image_size or not self.image_offset:
+            return None, None
+
+        # Canvas座標から画像内座標に変換
+        img_x = canvas_x - self.image_offset[0]
+        img_y = canvas_y - self.image_offset[1]
+
+        # 画像境界チェック
+        if (
+            img_x < 0
+            or img_y < 0
+            or img_x >= self.displayed_image_size[0]
+            or img_y >= self.displayed_image_size[1]
+        ):
+            return None, None
+
+        # 相対座標に変換（0.0～1.0）
+        rel_x = img_x / self.displayed_image_size[0]
+        rel_y = img_y / self.displayed_image_size[1]
+
+        return rel_x, rel_y
+
+    def relative_to_canvas_coords(self, rel_x: float, rel_y: float) -> tuple:
+        """相対座標（0.0～1.0）をCanvas座標に変換"""
+        if not self.displayed_image_size or not self.image_offset:
+            return None, None
+
+        # 表示されている画像内の座標に変換
+        img_x = rel_x * self.displayed_image_size[0]
+        img_y = rel_y * self.displayed_image_size[1]
+
+        # Canvas座標に変換
+        canvas_x = img_x + self.image_offset[0]
+        canvas_y = img_y + self.image_offset[1]
+
+        return int(canvas_x), int(canvas_y)
+
     def open_image(self):
         """画像を開くダイアログを表示し、選択された画像をcanvasに表示"""
         filepath = filedialog.askopenfilename(
@@ -575,17 +704,109 @@ class AOIView(tk.Toplevel):
         try:
             self.current_image_path = filepath
             image = Image.open(filepath)
-            image.thumbnail((self.canvas.winfo_width(), self.canvas.winfo_height()))
+
+            # 元画像のサイズを保存
+            self.original_image_size = image.size
+
+            # Canvas実際のサイズを取得
+            self.canvas.update_idletasks()  # サイズ情報を確実に取得
+            canvas_width = self.canvas.winfo_width()
+            canvas_height = self.canvas.winfo_height()
+
+            # Canvasサイズが取得できない場合（初期化時など）はデフォルト値を使用
+            if canvas_width <= 1 or canvas_height <= 1:
+                canvas_width = 800  # デフォルト幅
+                canvas_height = 400  # デフォルト高さ
+
+            # 画像のアスペクト比を計算
+            img_width, img_height = image.size
+            img_aspect = img_width / img_height
+            canvas_aspect = canvas_width / canvas_height
+
+            # アスペクト比を維持しつつ、Canvasに最適なサイズを計算
+            if img_aspect > canvas_aspect:
+                # 画像が横長の場合、幅を基準にリサイズ
+                new_width = canvas_width
+                new_height = int(canvas_width / img_aspect)
+            else:
+                # 画像が縦長の場合、高さを基準にリサイズ
+                new_height = canvas_height
+                new_width = int(canvas_height * img_aspect)
+
+            # 画像をリサイズ（アスペクト比保持、拡大・縮小両対応）
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            self.displayed_image_size = image.size
+
+            # 画像の中央配置のためのオフセット計算
+            self.image_offset = (
+                (canvas_width - self.displayed_image_size[0]) // 2,
+                (canvas_height - self.displayed_image_size[1]) // 2,
+            )
+
             self.photo_image = ImageTk.PhotoImage(image)
             self.canvas.delete("all")
+
+            # 画像を中央に配置
             self.canvas.create_image(
-                self.canvas.winfo_width() // 2,
-                self.canvas.winfo_height() // 2,
+                canvas_width // 2,
+                canvas_height // 2,
                 image=self.photo_image,
                 anchor="center",
             )
+
+            # 既存の座標マーカーを再描画
+            self.redraw_coordinate_markers()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to open image:\n{e}")
+
+    def draw_coordinate_marker(
+        self, rel_x: float, rel_y: float, tag="coordinate_marker"
+    ):
+        """相対座標に基づいて座標マーカーを描画"""
+        # 相対座標をCanvas座標に変換
+        canvas_x, canvas_y = self.relative_to_canvas_coords(rel_x, rel_y)
+
+        if canvas_x is None or canvas_y is None:
+            return
+
+        # マーカーのサイズ
+        r = 5
+
+        # 既存のマーカーを削除
+        self.canvas.delete(tag)
+
+        # 新しいマーカーを追加
+        self.canvas.create_oval(
+            canvas_x - r,
+            canvas_y - r,
+            canvas_x + r,
+            canvas_y + r,
+            fill=self.fillColor,
+            outline="red",
+            width=2,
+            tags=tag,
+        )
+
+    def redraw_coordinate_markers(self):
+        """既存の不良座標マーカーを再描画"""
+        # 現在の基板の不良リストを取得
+        current_defects = [
+            d
+            for d in self.defect_list
+            if d.current_board_index == self.current_board_index
+        ]
+
+        # 全ての座標マーカーをクリア
+        self.canvas.delete("defect_marker")
+
+        # 各不良座標にマーカーを描画
+        for i, defect in enumerate(current_defects):
+            if defect.x is not None and defect.y is not None:
+                # 相対座標として扱う
+                self.draw_coordinate_marker(
+                    defect.x, defect.y, tag=f"defect_marker_{i}"
+                )
 
     def on_defect_select(self, event):
         """defect_listboxで選択されたアイテムの情報をエントリに表示し、canvasに座標マーカーを表示"""
@@ -603,22 +824,14 @@ class AOIView(tk.Toplevel):
             defect_item = self.defect_list[
                 index
             ]  # defect_listから選択中のアイテムを取得
-            x, y = defect_item.x, defect_item.y  # X, Y座標を取得
-            self.current_coordinates = (x, y)  # 現在の座標を更新
+
+            # 相対座標を取得
+            rel_x, rel_y = defect_item.x, defect_item.y  # 相対座標として扱う
+            self.current_coordinates = (rel_x, rel_y)  # 現在の座標を更新
+
             # canvasに座標マーカーを表示
-            if x is not None and y is not None:
-                r = 5
-                # 既存の座標マーカーを削除
-                self.canvas.delete("coordinate_marker")
-                # 新しい座標マーカーを追加
-                self.canvas.create_oval(
-                    x - r,
-                    y - r,
-                    x + r,
-                    y + r,
-                    fill=self.fillColor,
-                    tags="coordinate_marker",
-                )
+            if rel_x is not None and rel_y is not None:
+                self.draw_coordinate_marker(rel_x, rel_y)
 
     def defect_number_update(self):
         filter_defect_list = [
@@ -713,26 +926,28 @@ class AOIView(tk.Toplevel):
         model_label = model_name + " " + board_name
         board_label = model_label + " " + side_label
 
-        # 座標を取得
-        x, y = self.current_coordinates if self.current_coordinates else (None, None)
+        # 相対座標を取得（既に相対座標として保存されている）
+        rel_x, rel_y = (
+            self.current_coordinates if self.current_coordinates else (None, None)
+        )
 
         # 入力チェック
         if not rf or not defect_name:
             messagebox.showwarning("Warning", "RFと不良項目を入力してください。")
             return
-        if x is None or y is None:
+        if rel_x is None or rel_y is None:
             messagebox.showwarning("Warning", "基板上の座標をクリックしてください。")
             return
 
-        # defect_listに追加
+        # defect_listに追加（相対座標で保存）
         defect = DefectInfo(
             line_name=self.current_line_name,
             current_board_index=current_board_index,
             defect_number=defect_number,
             reference=rf,
             defect_name=defect_name,
-            x=x,
-            y=y,
+            x=rel_x,  # 相対座標（0.0～1.0）
+            y=rel_y,  # 相対座標（0.0～1.0）
             insert_datetime=insert_date,
             serial=serial,
             aoi_user=aoi_user,
@@ -789,23 +1004,27 @@ class AOIView(tk.Toplevel):
 
     def on_canvas_click(self, event):
         # canvasに画像がない場合は何もしない
-        if not hasattr(self, "photo_image"):
+        if not hasattr(self, "photo_image") or not self.displayed_image_size:
             return
+
+        # Canvas座標を相対座標に変換
+        rel_x, rel_y = self.canvas_to_relative_coords(event.x, event.y)
+
+        # 画像外をクリックした場合は何もしない
+        if rel_x is None or rel_y is None:
+            messagebox.showinfo("Info", "画像内をクリックしてください。")
+            return
+
         # 不具合情報を初期化
         self.rf_entry.delete(0, tk.END)
         self.defect_entry.delete(0, tk.END)
         self.defect_number_update()
-        # クリック位置の座標を取得
-        x, y = event.x, event.y
-        self.current_coordinates = (x, y)
-        # クリック位置に小さな円を描画
-        r = 5
-        # 既存の座標マーカーを削除
-        self.canvas.delete("coordinate_marker")
-        # 新しい座標マーカーを追加
-        self.canvas.create_oval(
-            x - r, y - r, x + r, y + r, fill=self.fillColor, tags="coordinate_marker"
-        )
+
+        # 相対座標を保存
+        self.current_coordinates = (rel_x, rel_y)
+
+        # 座標マーカーを表示
+        self.draw_coordinate_marker(rel_x, rel_y)
 
     def update_defect_listbox(self):
         # defect_listboxをdefect_listの内容で更新
