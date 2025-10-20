@@ -1007,6 +1007,9 @@ class AOIView(tk.Toplevel):
         if not hasattr(self, "photo_image") or not self.displayed_image_size:
             return
 
+        # canvasに座標がある場合は削除
+        self.canvas.delete("coordinate_marker")
+
         # Canvas座標を相対座標に変換
         rel_x, rel_y = self.canvas_to_relative_coords(event.x, event.y)
 
@@ -1094,6 +1097,7 @@ class AOIView(tk.Toplevel):
             return
         # 不良リストをCSVに保存
         self.defect_list_to_csv_async()
+
         # 画面を更新
         self.current_board_index = self.current_board_index + 1
         self.total_boards = max(self.total_boards, self.current_board_index)
@@ -1108,8 +1112,10 @@ class AOIView(tk.Toplevel):
             return False
         return True
 
-    def defect_list_to_csv_async(self):
-        """非同期にdefect_listをCSVファイルに保存"""
+    def defect_list_to_csv_async(self) -> bool:
+        """
+        非同期にdefect_listをCSVファイルに保存
+        """
 
         def _defect_list_to_csv():
             try:
@@ -1119,8 +1125,12 @@ class AOIView(tk.Toplevel):
                     self.current_image_filename,
                 )
                 FileManager.save_defect_csv(self.defect_list, file_path)
+            except PermissionError as e:
+                messagebox.showerror("Error", "ファイルが他のプロセスで使用中です。")
             except OSError as e:
-                raise OSError(e)
+                messagebox.showerror(
+                    "Error", f"Failed to save defect list to CSV:\n{e}"
+                )
             except Exception as e:
                 messagebox.showerror(
                     "Error", f"Failed to save defect list to CSV:\n{e}"
@@ -1218,6 +1228,9 @@ class AOIView(tk.Toplevel):
         # defect_listをCSVに保存
         if len(self.defect_list) > 0:
             self.defect_list_to_csv_async()
+
+        # 座標を初期化
+        self.canvas.delete("coordinate_marker")
 
         # 指図を入力するダイアログを表示
         dialog = LotChangeDialog(self)
