@@ -3,7 +3,7 @@ name = "aoi-defect-history"
 version = "0.1.01"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.8,<3.9"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "aoi-data-manager",
     "ktec-smt-schedule",
@@ -15,8 +15,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    # "autopep8>=2.3.2",
-    # "black>=25.9.0",
+    "autopep8>=2.3.2",
+    "black>=25.9.0",
     "yapf>=0.43.0",
     "pyinstaller>=6.0.0",
 ]
@@ -29,7 +29,7 @@ ktec-smt-schedule = { git = "https://github.com/kent2980/ktec_smt_schedule.git" 
 dev = [
     "psutil>=7.1.1",
     "pyinstaller>=6.16.0",
-    # "pytest>=8.4.2",
+    "pytest>=8.4.2",
     "pyyaml>=6.0.3",
     "toml>=0.10.2",
 ]
