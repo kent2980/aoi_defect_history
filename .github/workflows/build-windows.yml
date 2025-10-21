@@ -11,6 +11,8 @@ on:
 
 env:
   APP_NAME: aoi-defect-history
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: 1
 
 jobs:
   test:
@@ -45,7 +47,7 @@ jobs:
       continue-on-error: true
 
     - name: Run basic import test
-      run: uv run python -c "import src.aoi_view; print('✅ Import successful')"
+      run: uv run python -c "import src.aoi_view; print('Import successful')"
 
     - name: Check dependencies
       run: uv run python -m pip check
@@ -96,7 +98,7 @@ jobs:
     - name: Run pre-build tests
       run: |
         uv run python tests/validate_32bit_config.py
-        uv run python -c "import src.aoi_view; print('✅ Import test passed')"
+        uv run python -c "import src.aoi_view; print('Import test passed')"
       continue-on-error: true
 
     - name: Build with PyInstaller (${{ matrix.output-name }})
@@ -109,13 +111,13 @@ jobs:
         $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
         $exePath = "dist/$outputName/$outputName.exe"
         if (Test-Path $exePath) {
-          Write-Host "✅ Executable created successfully: $exePath"
+          Write-Host "Executable created successfully: $exePath"
           $fileInfo = Get-Item $exePath
           Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
           Write-Host "Created: $($fileInfo.CreationTime)"
         } else {
-          Write-Error "❌ Executable not found: $exePath"
-          Write-Host "📁 Checking dist directory contents:"
+          Write-Error "Executable not found: $exePath"
+          Write-Host "Checking dist directory contents:"
           if (Test-Path "dist") {
             Get-ChildItem "dist" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
           }
@@ -130,9 +132,9 @@ jobs:
         # Note: GUI アプリケーションなので、基本的な起動確認のみ
         # 実際のGUIテストはヘッドレス環境では困難
         if (Test-Path $exePath) {
-          Write-Host "✅ Executable file exists and is ready for distribution"
+          Write-Host "Executable file exists and is ready for distribution"
         } else {
-          Write-Host "❌ Executable file not found"
+          Write-Host "Executable file not found"
         }
       continue-on-error: true
 
@@ -155,7 +157,7 @@ jobs:
           Write-Warning "Executable not found at expected location: $exeSource"
         }
         
-        Write-Host "✅ Packages created:"
+        Write-Host "Packages created:"
         if (Test-Path $exeTarget) {
           Write-Host "  - Single executable: $exeTarget"
         }
