@@ -89,11 +89,11 @@ jobs:
       matrix:
         include:
           - architecture: x64
-            python-version: '3.9'
+            python-version: '3.8'
             target-arch: x64
             output-name: win64
           - architecture: x86
-            python-version: '3.9'
+            python-version: '3.8'
             target-arch: x86
             output-name: win32
     
