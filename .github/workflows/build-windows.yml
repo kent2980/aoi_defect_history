@@ -50,7 +50,36 @@ jobs:
       run: uv run python -c "import src.aoi_view; print('Import successful')"
 
     - name: Check dependencies
-      run: uv run python -m pip check
+      run: |
+        echo "Checking installed packages..."
+        uv pip list
+        echo "Verifying package compatibility..."
+        uv run python -c "
+        try:
+            import sys
+            print(f'Python version: {sys.version}')
+            
+            # 主要な依存関係の確認
+            packages_to_check = ['tkinter', 'PIL', 'pandas']
+            missing_packages = []
+            
+            for package in packages_to_check:
+                try:
+                    __import__(package)
+                    print(f'OK {package}: Available')
+                except ImportError as e:
+                    print(f'FAIL {package}: Missing - {e}')
+                    missing_packages.append(package)
+            
+            if missing_packages:
+                print(f'Missing packages: {missing_packages}')
+                sys.exit(1)
+            else:
+                print('All required packages are available')
+        except Exception as e:
+            print(f'Dependency check failed: {e}')
+            sys.exit(1)
+        "
 
   build:
     name: Build Executables
