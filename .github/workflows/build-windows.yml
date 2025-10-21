@@ -123,6 +123,51 @@ jobs:
       run: |
         uv run python -c "import struct; print(f'Python architecture: {struct.calcsize(\"P\") * 8}bit')"
         uv run python -c "import platform; print(f'Platform: {platform.platform()}')"
+        
+    - name: Locate Python DLL
+      run: |
+        $pythonExe = (uv run python -c "import sys; print(sys.executable)")
+        $pythonDir = Split-Path $pythonExe
+        $pythonVersion = (uv run python -c "import sys; print(f'python{sys.version_info.major}{sys.version_info.minor}')")
+        $dllName = "$pythonVersion.dll"
+        
+        Write-Host "Python executable: $pythonExe"
+        Write-Host "Python directory: $pythonDir"
+        Write-Host "Looking for: $dllName"
+        Write-Host "pythonLocation env: $env:pythonLocation"
+        
+        # 複数の場所を検索
+        $searchPaths = @(
+          "$pythonDir\$dllName",
+          "$env:pythonLocation\$dllName",
+          "$env:pythonLocation\DLLs\$dllName",
+          "C:\Windows\System32\$dllName"
+        )
+        
+        $foundDll = $null
+        foreach ($path in $searchPaths) {
+          if (Test-Path $path) {
+            $foundDll = $path
+            Write-Host "Found DLL: $path"
+            $fileInfo = Get-Item $path
+            Write-Host "  Size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
+            Write-Host "  Version: $($fileInfo.VersionInfo.FileVersion)"
+            break
+          } else {
+            Write-Host "Not found: $path"
+          }
+        }
+        
+        if (-not $foundDll) {
+          Write-Warning "Python DLL not found in expected locations!"
+          Write-Host "Searching in PATH..."
+          foreach ($pathDir in ($env:PATH -split ';')) {
+            if ($pathDir -and (Test-Path "$pathDir\$dllName")) {
+              Write-Host "Found in PATH: $pathDir\$dllName"
+              break
+            }
+          }
+        }
 
     - name: Run pre-build tests
       run: |
@@ -133,7 +178,49 @@ jobs:
     - name: Build with PyInstaller (${{ matrix.output-name }})
       run: |
         $env:TARGET_ARCH = "${{ matrix.target-arch }}"
+        $env:GITHUB_ACTIONS = "true"
+        
+        # PyInstallerビルド実行
         uv run pyinstaller --clean --noconfirm pyinstaller.spec
+        
+        # ビルド後にPython DLLが含まれているか確認・修正
+        $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
+        $distDir = "dist/$outputName"
+        $internalDir = "$distDir/_internal"
+        
+        # Python DLLを確認
+        $pythonVersion = (uv run python -c "import sys; print(f'python{sys.version_info.major}{sys.version_info.minor}')")
+        $dllName = "$pythonVersion.dll"
+        $dllInDist = "$internalDir/$dllName"
+        
+        if (-not (Test-Path $dllInDist)) {
+          Write-Warning "Python DLL not found in distribution. Attempting manual copy..."
+          
+          # Python DLLを手動で検索・コピー
+          $pythonExe = (uv run python -c "import sys; print(sys.executable)")
+          $searchPaths = @(
+            "$(Split-Path $pythonExe)/$dllName",
+            "$env:pythonLocation/$dllName",
+            "$env:pythonLocation/DLLs/$dllName"
+          )
+          
+          $sourceDll = $null
+          foreach ($path in $searchPaths) {
+            if (Test-Path $path) {
+              $sourceDll = $path
+              break
+            }
+          }
+          
+          if ($sourceDll) {
+            Copy-Item $sourceDll $dllInDist -Force
+            Write-Host "Manually copied Python DLL: $sourceDll -> $dllInDist"
+          } else {
+            Write-Error "Could not locate Python DLL for manual copy!"
+          }
+        } else {
+          Write-Host "Python DLL found in distribution: $dllInDist"
+        }
 
     - name: Verify executable
       run: |

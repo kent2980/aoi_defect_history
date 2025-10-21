@@ -59,14 +59,26 @@ binaries = []
 python_version = f"python{sys.version_info.major}{sys.version_info.minor}"
 python_dll_name = f"{python_version}.dll"
 
-# Python DLLの場所を探す
+# Python DLLの場所を探す（GitHub Actions対応）
 import sysconfig
 python_dll_paths = [
     Path(sys.executable).parent / python_dll_name,  # 標準的な場所
-    Path(sysconfig.get_path('stdlib')) / '..' / python_dll_name,  # stdlib の親ディレクトリ
+    Path(sysconfig.get_path('stdlib')).parent / python_dll_name,  # stdlib の親ディレクトリ
     Path(sys.prefix) / python_dll_name,  # sys.prefix
+    Path(sys.base_prefix) / python_dll_name,  # sys.base_prefix (仮想環境対応)
+    Path(sys.executable).parent.parent / python_dll_name,  # 仮想環境の親
     Path(os.environ.get('WINDIR', 'C:/Windows')) / 'System32' / python_dll_name,  # システムディレクトリ
 ]
+
+# GitHub Actions環境での追加検索パス
+if 'GITHUB_ACTIONS' in os.environ:
+    # GitHub Actionsの特別なパス
+    hostedtoolcache_python = os.environ.get('pythonLocation')
+    if hostedtoolcache_python:
+        python_dll_paths.insert(0, Path(hostedtoolcache_python) / python_dll_name)
+        python_dll_paths.insert(1, Path(hostedtoolcache_python) / 'DLLs' / python_dll_name)
+    
+    print(f"GitHub Actions detected. Python location: {hostedtoolcache_python}")
 
 python_dll_path = None
 for dll_path in python_dll_paths:
@@ -79,14 +91,41 @@ if python_dll_path:
     print(f"Found Python DLL: {python_dll_path}")
 else:
     print(f"Warning: {python_dll_name} not found in standard locations")
-    # 追加の検索ロジック
-    for path in os.environ.get('PATH', '').split(os.pathsep):
-        dll_candidate = Path(path) / python_dll_name
-        if dll_candidate.exists():
-            binaries.append((str(dll_candidate), '.'))
-            python_dll_path = dll_candidate
-            print(f"Found Python DLL in PATH: {dll_candidate}")
+    print("Searched in:")
+    for path in python_dll_paths:
+        print(f"  - {path} ({'Found' if path.exists() else 'Not found'})")
+    
+    # 追加の検索ロジック（PATHとPYTHONPATH）
+    for env_var in ['PATH', 'PYTHONPATH']:
+        env_paths = os.environ.get(env_var, '').split(os.pathsep)
+        for path in env_paths:
+            if path:
+                dll_candidate = Path(path) / python_dll_name
+                if dll_candidate.exists():
+                    binaries.append((str(dll_candidate), '.'))
+                    python_dll_path = dll_candidate
+                    print(f"Found Python DLL in {env_var}: {dll_candidate}")
+                    break
+        if python_dll_path:
             break
+
+# 強制的にPython DLLを検索（最後の手段）
+if not python_dll_path and sys.platform == 'win32':
+    try:
+        import ctypes
+        import ctypes.util
+        dll_handle = ctypes.util.find_library(python_version)
+        if dll_handle:
+            dll_path = Path(dll_handle)
+            if dll_path.exists():
+                binaries.append((str(dll_path), '.'))
+                python_dll_path = dll_path
+                print(f"Found Python DLL via ctypes: {dll_path}")
+    except Exception as e:
+        print(f"ctypes search failed: {e}")
+
+if not python_dll_path:
+    print(f"ERROR: Could not locate {python_dll_name}. Build may fail at runtime.")
 
 # 隠しインポートの設定
 hiddenimports = [
