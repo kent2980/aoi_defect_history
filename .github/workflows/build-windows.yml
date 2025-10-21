@@ -20,7 +20,7 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9']
         architecture: ['x64', 'x86']
     
     steps:
@@ -89,11 +89,11 @@ jobs:
       matrix:
         include:
           - architecture: x64
-            python-version: '3.11'
+            python-version: '3.9'
             target-arch: x64
             output-name: win64
           - architecture: x86
-            python-version: '3.11'
+            python-version: '3.9'
             target-arch: x86
             output-name: win32
     
