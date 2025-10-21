@@ -61,6 +61,7 @@ dev = [
 [package.dev-dependencies]
 dev = [
     { name = "psutil" },
+    { name = "pyinstaller" },
     { name = "pytest" },
     { name = "pyyaml" },
     { name = "toml" },
@@ -84,6 +85,7 @@ provides-extras = ["dev"]
 [package.metadata.requires-dev]
 dev = [
     { name = "psutil", specifier = ">=7.1.1" },
+    { name = "pyinstaller", specifier = ">=6.16.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "toml", specifier = ">=0.10.2" },

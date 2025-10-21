@@ -139,11 +139,36 @@ jobs:
       run: |
         $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
         $exePath = "dist/$outputName/$outputName.exe"
+        $distDir = "dist/$outputName"
+        
         if (Test-Path $exePath) {
           Write-Host "Executable created successfully: $exePath"
           $fileInfo = Get-Item $exePath
           Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
           Write-Host "Created: $($fileInfo.CreationTime)"
+          
+          # Python DLLが含まれているか確認
+          $pythonDll = Get-ChildItem $distDir -Filter "python*.dll" -Recurse
+          if ($pythonDll) {
+            Write-Host "Python DLL found:"
+            foreach ($dll in $pythonDll) {
+              Write-Host "  - $($dll.Name) ($([math]::Round($dll.Length / 1MB, 2)) MB)"
+            }
+          } else {
+            Write-Warning "Python DLL not found in distribution"
+          }
+          
+          # 主要な依存関係ファイルの確認
+          $importantFiles = @("_tkinter.pyd", "PIL")
+          foreach ($file in $importantFiles) {
+            $found = Get-ChildItem $distDir -Filter "*$file*" -Recurse
+            if ($found) {
+              Write-Host "Found dependency: $file"
+            } else {
+              Write-Warning "Missing dependency: $file"
+            }
+          }
+          
         } else {
           Write-Error "Executable not found: $exePath"
           Write-Host "Checking dist directory contents:"

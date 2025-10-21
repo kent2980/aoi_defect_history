@@ -52,6 +52,42 @@ for data_file in embedded_files:
     if data_path.exists():
         datas.append((str(data_path), '.'))
 
+# バイナリファイルの設定（pythonXX.dllを含める）
+binaries = []
+
+# Python DLLを明示的に含める
+python_version = f"python{sys.version_info.major}{sys.version_info.minor}"
+python_dll_name = f"{python_version}.dll"
+
+# Python DLLの場所を探す
+import sysconfig
+python_dll_paths = [
+    Path(sys.executable).parent / python_dll_name,  # 標準的な場所
+    Path(sysconfig.get_path('stdlib')) / '..' / python_dll_name,  # stdlib の親ディレクトリ
+    Path(sys.prefix) / python_dll_name,  # sys.prefix
+    Path(os.environ.get('WINDIR', 'C:/Windows')) / 'System32' / python_dll_name,  # システムディレクトリ
+]
+
+python_dll_path = None
+for dll_path in python_dll_paths:
+    if dll_path.exists():
+        python_dll_path = dll_path
+        break
+
+if python_dll_path:
+    binaries.append((str(python_dll_path), '.'))
+    print(f"Found Python DLL: {python_dll_path}")
+else:
+    print(f"Warning: {python_dll_name} not found in standard locations")
+    # 追加の検索ロジック
+    for path in os.environ.get('PATH', '').split(os.pathsep):
+        dll_candidate = Path(path) / python_dll_name
+        if dll_candidate.exists():
+            binaries.append((str(dll_candidate), '.'))
+            python_dll_path = dll_candidate
+            print(f"Found Python DLL in PATH: {dll_candidate}")
+            break
+
 # 隠しインポートの設定
 hiddenimports = [
     # GUI関連
@@ -69,9 +105,29 @@ hiddenimports = [
     'PIL.ImageDraw',
     'PIL.ImageFont',
     
-    # データ処理関連
+    # データ処理関連 - Numpy/Pandas 依存関係を詳細に指定
     'pandas',
     'numpy',
+    'numpy.core',
+    'numpy.core._methods',
+    'numpy.lib',
+    'numpy.lib.format',
+    'numpy.linalg',
+    'numpy.random',
+    'numpy._pytesttester',  # Pandasが必要とするnumpyテストモジュール
+    'pandas.core',
+    'pandas.core.api',
+    'pandas.core.arrays',
+    'pandas.io',
+    'pandas.io.formats',
+    'pandas.io.formats.format',
+    'pandas.io.common',
+    'pandas.plotting',
+    'pandas._libs',
+    'pandas._libs.tslibs',
+    'pandas.compat',
+    
+    # HTTP関連
     'requests',
     
     # プロジェクト固有モジュール
@@ -100,12 +156,22 @@ if is_32bit:
         'pathlib',
         'threading',
         'concurrent.futures',
+        # 32bit環境でのnumpy追加依存関係
+        'numpy.distutils',
+        'numpy.f2py',
+        'numpy.testing',
+        'numpy.testing._private',
+        # 32bit環境でのpandas追加依存関係
+        'pandas.util',
+        'pandas.errors',
+        'pandas.core.dtypes',
+        'pandas.core.ops',
     ])
     print("Added 32bit specific hidden imports")
 
 # 除外するモジュール
 excludes = [
-    # テスト関連モジュールを除外
+    # テスト関連モジュールを除外（但しnumpy._pytesttesterは除く）
     'pytest',
     '_pytest',
     'unittest',
@@ -148,7 +214,7 @@ excludes = [
 a = Analysis(
     ['main.py'],
     pathex=[str(project_root)],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -164,8 +230,19 @@ a = Analysis(
 # 不要なモジュールを手動で除去
 excluded_modules = excludes
 
-# pure pythonモジュールから除外
-a.pure = [item for item in a.pure if not any(excluded in item[0] for excluded in excluded_modules)]
+# pure pythonモジュールから除外（但し必要なnumpyモジュールは保持）
+def should_exclude(module_name):
+    """モジュールを除外すべきかどうかを判定"""
+    # numpy._pytesttesterは除外しない
+    if 'numpy._pytesttester' in module_name:
+        return False
+    # pandas関連も除外しない
+    if any(pandas_mod in module_name for pandas_mod in ['pandas.', 'numpy.core', 'numpy.lib', 'numpy.linalg']):
+        return False
+    # 除外リストに含まれているかチェック
+    return any(excluded in module_name for excluded in excluded_modules)
+
+a.pure = [item for item in a.pure if not should_exclude(item[0])]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
@@ -237,8 +314,10 @@ print(f"  Target architecture: {target_arch or 'auto-detected'}")
 print(f"  Application name: {output_name}")
 print(f"  Console mode: False")
 print(f"  Icon file: {icon_path if icon_path else 'None'}")
+print(f"  Python DLL: {python_dll_path if python_dll_path else 'Not found'}")
 print(f"  Hidden imports: {len(hiddenimports)} modules")
 print(f"  Data files: {len(datas)} files")
+print(f"  Binary files: {len(binaries)} files")
 print(f"  Excluded modules: {len(excludes)} modules")
 print(f"  32bit optimizations: {'Enabled' if is_32bit else 'Disabled'}")
 print(f"  Distribution directory: {dist_dir}")
