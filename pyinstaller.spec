@@ -59,8 +59,38 @@ binaries = []
 python_version = f"python{sys.version_info.major}{sys.version_info.minor}"
 python_dll_name = f"{python_version}.dll"
 
-# Python DLLの場所を探す（GitHub Actions対応）
+# Python DLLの場所を探す（アーキテクチャ対応）
 import sysconfig
+import struct
+
+def check_dll_architecture(dll_path):
+    """DLLファイルのアーキテクチャを確認"""
+    try:
+        with open(dll_path, 'rb') as f:
+            # PE ヘッダーを読み取り
+            f.seek(60)  # PE オフセットの位置
+            pe_offset = struct.unpack('<I', f.read(4))[0]
+            f.seek(pe_offset + 4)  # Machine type の位置
+            machine_type = struct.unpack('<H', f.read(2))[0]
+            
+            # 0x8664: x64, 0x014c: x86
+            if machine_type == 0x8664:
+                return 'x64'
+            elif machine_type == 0x014c:
+                return 'x86'
+            else:
+                return 'unknown'
+    except Exception as e:
+        print(f"Could not determine architecture for {dll_path}: {e}")
+        return 'unknown'
+
+# 現在のアーキテクチャを確認
+current_arch = 'x64' if struct.calcsize("P") == 8 else 'x86'
+target_architecture = target_arch if target_arch else current_arch
+
+print(f"Current Python architecture: {current_arch}")
+print(f"Target architecture: {target_architecture}")
+
 python_dll_paths = [
     Path(sys.executable).parent / python_dll_name,  # 標準的な場所
     Path(sysconfig.get_path('stdlib')).parent / python_dll_name,  # stdlib の親ディレクトリ
@@ -80,11 +110,39 @@ if 'GITHUB_ACTIONS' in os.environ:
     
     print(f"GitHub Actions detected. Python location: {hostedtoolcache_python}")
 
+# アーキテクチャに一致するDLLを検索
 python_dll_path = None
 for dll_path in python_dll_paths:
     if dll_path.exists():
-        python_dll_path = dll_path
-        break
+        dll_arch = check_dll_architecture(dll_path)
+        print(f"Found DLL: {dll_path} (Architecture: {dll_arch})")
+        
+        if dll_arch == target_architecture:
+            python_dll_path = dll_path
+            print(f"✓ Architecture match: {dll_arch}")
+            break
+        else:
+            print(f"✗ Architecture mismatch: {dll_arch} != {target_architecture}")
+
+# アーキテクチャが一致するDLLが見つからない場合の追加検索
+if not python_dll_path:
+    print("No matching architecture DLL found. Searching system directories...")
+    
+    # システムディレクトリでの追加検索
+    system_search_paths = [
+        Path(os.environ.get('WINDIR', 'C:/Windows')) / 'System32' / python_dll_name,
+        Path(os.environ.get('WINDIR', 'C:/Windows')) / 'SysWOW64' / python_dll_name,  # 32bit DLL on 64bit system
+    ]
+    
+    for dll_path in system_search_paths:
+        if dll_path.exists():
+            dll_arch = check_dll_architecture(dll_path)
+            print(f"System DLL: {dll_path} (Architecture: {dll_arch})")
+            
+            if dll_arch == target_architecture:
+                python_dll_path = dll_path
+                print(f"✓ Found matching system DLL: {dll_arch}")
+                break
 
 if python_dll_path:
     binaries.append((str(python_dll_path), '.'))
@@ -350,13 +408,22 @@ post_build_copy()
 # ビルド情報の出力
 print(f"\nBuild completed:")
 print(f"  Target architecture: {target_arch or 'auto-detected'}")
+print(f"  Current Python architecture: {current_arch}")
 print(f"  Application name: {output_name}")
 print(f"  Console mode: False")
 print(f"  Icon file: {icon_path if icon_path else 'None'}")
-print(f"  Python DLL: {python_dll_path if python_dll_path else 'Not found'}")
+if python_dll_path:
+    dll_arch = check_dll_architecture(python_dll_path)
+    arch_match = "✓ Match" if dll_arch == target_architecture else f"✗ Mismatch ({dll_arch})"
+    print(f"  Python DLL: {python_dll_path}")
+    print(f"  DLL Architecture: {dll_arch} {arch_match}")
+else:
+    print(f"  Python DLL: Not found")
 print(f"  Hidden imports: {len(hiddenimports)} modules")
 print(f"  Data files: {len(datas)} files")
 print(f"  Binary files: {len(binaries)} files")
 print(f"  Excluded modules: {len(excludes)} modules")
 print(f"  32bit optimizations: {'Enabled' if is_32bit else 'Disabled'}")
 print(f"  Distribution directory: {dist_dir}")
+if target_arch and current_arch != target_architecture:
+    print(f"  ⚠️  Cross-compilation: {current_arch} → {target_architecture}")

@@ -130,11 +130,30 @@ jobs:
         $pythonDir = Split-Path $pythonExe
         $pythonVersion = (uv run python -c "import sys; print(f'python{sys.version_info.major}{sys.version_info.minor}')")
         $dllName = "$pythonVersion.dll"
+        $targetArch = "${{ matrix.target-arch }}"
         
         Write-Host "Python executable: $pythonExe"
         Write-Host "Python directory: $pythonDir"
+        Write-Host "Target architecture: $targetArch"
         Write-Host "Looking for: $dllName"
         Write-Host "pythonLocation env: $env:pythonLocation"
+        
+        # アーキテクチャ確認関数
+        function Check-DllArchitecture($dllPath) {
+          try {
+            $bytes = [System.IO.File]::ReadAllBytes($dllPath)
+            $peOffset = [BitConverter]::ToUInt32($bytes, 60)
+            $machineType = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            
+            switch ($machineType) {
+              0x8664 { return "x64" }
+              0x014c { return "x86" }
+              default { return "unknown" }
+            }
+          } catch {
+            return "unknown"
+          }
+        }
         
         # 複数の場所を検索
         $searchPaths = @(
@@ -144,27 +163,44 @@ jobs:
           "C:\Windows\System32\$dllName"
         )
         
+        # 32bit用の追加検索パス
+        if ($targetArch -eq "x86") {
+          $searchPaths += "C:\Windows\SysWOW64\$dllName"
+        }
+        
         $foundDll = $null
         foreach ($path in $searchPaths) {
           if (Test-Path $path) {
-            $foundDll = $path
-            Write-Host "Found DLL: $path"
+            $dllArch = Check-DllArchitecture $path
+            Write-Host "Found DLL: $path (Architecture: $dllArch)"
+            
             $fileInfo = Get-Item $path
             Write-Host "  Size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
             Write-Host "  Version: $($fileInfo.VersionInfo.FileVersion)"
-            break
+            
+            if ($dllArch -eq $targetArch) {
+              $foundDll = $path
+              Write-Host "  ✓ Architecture match: $dllArch"
+              break
+            } else {
+              Write-Host "  ✗ Architecture mismatch: $dllArch != $targetArch"
+            }
           } else {
             Write-Host "Not found: $path"
           }
         }
         
         if (-not $foundDll) {
-          Write-Warning "Python DLL not found in expected locations!"
-          Write-Host "Searching in PATH..."
+          Write-Warning "No matching architecture Python DLL found!"
+          Write-Host "Searching in PATH for any $dllName..."
           foreach ($pathDir in ($env:PATH -split ';')) {
             if ($pathDir -and (Test-Path "$pathDir\$dllName")) {
-              Write-Host "Found in PATH: $pathDir\$dllName"
-              break
+              $dllArch = Check-DllArchitecture "$pathDir\$dllName"
+              Write-Host "Found in PATH: $pathDir\$dllName (Architecture: $dllArch)"
+              if ($dllArch -eq $targetArch) {
+                Write-Host "✓ Architecture match in PATH"
+                break
+              }
             }
           }
         }
@@ -187,39 +223,99 @@ jobs:
         $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
         $distDir = "dist/$outputName"
         $internalDir = "$distDir/_internal"
+        $targetArch = "${{ matrix.target-arch }}"
+        
+        # アーキテクチャ確認関数
+        function Check-DllArchitecture($dllPath) {
+          try {
+            $bytes = [System.IO.File]::ReadAllBytes($dllPath)
+            $peOffset = [BitConverter]::ToUInt32($bytes, 60)
+            $machineType = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+            
+            switch ($machineType) {
+              0x8664 { return "x64" }
+              0x014c { return "x86" }
+              default { return "unknown" }
+            }
+          } catch {
+            return "unknown"
+          }
+        }
         
         # Python DLLを確認
         $pythonVersion = (uv run python -c "import sys; print(f'python{sys.version_info.major}{sys.version_info.minor}')")
         $dllName = "$pythonVersion.dll"
         $dllInDist = "$internalDir/$dllName"
         
-        if (-not (Test-Path $dllInDist)) {
-          Write-Warning "Python DLL not found in distribution. Attempting manual copy..."
+        # python3.dllも確認
+        $python3DllInDist = "$internalDir/python3.dll"
+        
+        $needsReplacement = $false
+        
+        if (Test-Path $dllInDist) {
+          $dllArch = Check-DllArchitecture $dllInDist
+          Write-Host "Found Python DLL in distribution: $dllInDist (Architecture: $dllArch)"
           
-          # Python DLLを手動で検索・コピー
+          if ($dllArch -ne $targetArch) {
+            Write-Warning "Architecture mismatch! Found: $dllArch, Expected: $targetArch"
+            $needsReplacement = $true
+          }
+        } else {
+          Write-Warning "Python DLL not found in distribution."
+          $needsReplacement = $true
+        }
+        
+        if (Test-Path $python3DllInDist) {
+          $python3DllArch = Check-DllArchitecture $python3DllInDist
+          Write-Host "Found python3.dll in distribution: $python3DllInDist (Architecture: $python3DllArch)"
+          
+          if ($python3DllArch -ne $targetArch) {
+            Write-Warning "python3.dll architecture mismatch! Found: $python3DllArch, Expected: $targetArch"
+            Remove-Item $python3DllInDist -Force
+            Write-Host "Removed incorrect python3.dll"
+          }
+        }
+        
+        if ($needsReplacement) {
+          Write-Host "Attempting to find correct architecture DLL..."
+          
+          # 正しいアーキテクチャのPython DLLを手動で検索・コピー
           $pythonExe = (uv run python -c "import sys; print(sys.executable)")
           $searchPaths = @(
             "$(Split-Path $pythonExe)/$dllName",
             "$env:pythonLocation/$dllName",
-            "$env:pythonLocation/DLLs/$dllName"
+            "$env:pythonLocation/DLLs/$dllName",
+            "C:\Windows\System32\$dllName"
           )
+          
+          # 32bit用の追加検索パス
+          if ($targetArch -eq "x86") {
+            $searchPaths += "C:\Windows\SysWOW64\$dllName"
+          }
           
           $sourceDll = $null
           foreach ($path in $searchPaths) {
             if (Test-Path $path) {
-              $sourceDll = $path
-              break
+              $pathArch = Check-DllArchitecture $path
+              Write-Host "Checking: $path (Architecture: $pathArch)"
+              
+              if ($pathArch -eq $targetArch) {
+                $sourceDll = $path
+                Write-Host "✓ Found matching architecture DLL: $path"
+                break
+              }
             }
           }
           
           if ($sourceDll) {
+            if (Test-Path $dllInDist) {
+              Remove-Item $dllInDist -Force
+            }
             Copy-Item $sourceDll $dllInDist -Force
-            Write-Host "Manually copied Python DLL: $sourceDll -> $dllInDist"
+            Write-Host "Replaced Python DLL: $sourceDll -> $dllInDist"
           } else {
-            Write-Error "Could not locate Python DLL for manual copy!"
+            Write-Error "Could not locate correct architecture Python DLL for $targetArch!"
           }
-        } else {
-          Write-Host "Python DLL found in distribution: $dllInDist"
         }
 
     - name: Verify executable
