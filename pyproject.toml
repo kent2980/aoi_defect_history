@@ -1,13 +1,14 @@
 [project]
 name = "aoi-defect-history"
-version = "0.1.0"
+version = "0.1.01"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9,<3.12"
 dependencies = [
     "aoi-data-manager",
     "ktec-smt-schedule",
-    "pandas<=1.5.3",
+    "numpy==1.24.3",
+    "pandas==2.0.3",
     "pillow<=10.3.0",
     "requests>=2.31.0",
 ]
@@ -21,5 +22,13 @@ dev = [
 ]
 
 [tool.uv.sources]
-ktec-smt-schedule = { git = "https://github.com/kent2980/ktec_smt_schedule.git" }
 aoi-data-manager = { git = "https://github.com/kent2980/aoi_data_manager.git" }
+ktec-smt-schedule = { git = "https://github.com/kent2980/ktec_smt_schedule.git" }
+
+[dependency-groups]
+dev = [
+    "psutil>=7.1.1",
+    "pytest>=8.4.2",
+    "pyyaml>=6.0.3",
+    "toml>=0.10.2",
+]

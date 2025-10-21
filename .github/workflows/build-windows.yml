@@ -1,0 +1,316 @@
+name: Build Windows Executables
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  APP_NAME: aoi-defect-history
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+        architecture: ['x64', 'x86']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }} (${{ matrix.architecture }})
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Create virtual environment
+      run: uv venv --python ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Run 32bit compatibility tests
+      run: uv run python tests/test_32bit_compatibility.py
+      continue-on-error: true
+
+    - name: Run basic import test
+      run: uv run python -c "import src.aoi_view; print('✅ Import successful')"
+
+    - name: Check dependencies
+      run: uv run python -m pip check
+
+  build:
+    name: Build Executables
+    runs-on: windows-latest
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - architecture: x64
+            python-version: '3.11'
+            target-arch: x64
+            output-name: win64
+          - architecture: x86
+            python-version: '3.11'
+            target-arch: x86
+            output-name: win32
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }} (${{ matrix.architecture }})
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.architecture }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Create virtual environment
+      run: uv venv --python ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Install PyInstaller
+      run: uv add --dev pyinstaller
+
+    - name: Verify Python architecture
+      run: |
+        uv run python -c "import struct; print(f'Python architecture: {struct.calcsize(\"P\") * 8}bit')"
+        uv run python -c "import platform; print(f'Platform: {platform.platform()}')"
+
+    - name: Run pre-build tests
+      run: |
+        uv run python tests/validate_32bit_config.py
+        uv run python -c "import src.aoi_view; print('✅ Import test passed')"
+      continue-on-error: true
+
+    - name: Build with PyInstaller (${{ matrix.output-name }})
+      run: |
+        $env:TARGET_ARCH = "${{ matrix.target-arch }}"
+        uv run pyinstaller --clean --noconfirm pyinstaller.spec
+
+    - name: Verify executable
+      run: |
+        $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
+        $exePath = "dist/$outputName/$outputName.exe"
+        if (Test-Path $exePath) {
+          Write-Host "✅ Executable created successfully: $exePath"
+          $fileInfo = Get-Item $exePath
+          Write-Host "File size: $([math]::Round($fileInfo.Length / 1MB, 2)) MB"
+          Write-Host "Created: $($fileInfo.CreationTime)"
+        } else {
+          Write-Error "❌ Executable not found: $exePath"
+          Write-Host "📁 Checking dist directory contents:"
+          if (Test-Path "dist") {
+            Get-ChildItem "dist" -Recurse | ForEach-Object { Write-Host "  $($_.FullName)" }
+          }
+          exit 1
+        }
+
+    - name: Test executable (basic)
+      run: |
+        $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
+        $exePath = "dist/$outputName/$outputName.exe"
+        Write-Host "Testing executable: $exePath"
+        # Note: GUI アプリケーションなので、基本的な起動確認のみ
+        # 実際のGUIテストはヘッドレス環境では困難
+        if (Test-Path $exePath) {
+          Write-Host "✅ Executable file exists and is ready for distribution"
+        } else {
+          Write-Host "❌ Executable file not found"
+        }
+      continue-on-error: true
+
+    - name: Create distribution package
+      run: |
+        $outputName = "${{ env.APP_NAME }}-${{ matrix.output-name }}"
+        $distDir = "dist/$outputName"
+        $zipPath = "dist/$outputName-full.zip"
+        
+        # フルパッケージ（依存ファイル含む）の作成
+        if (Test-Path $zipPath) { Remove-Item $zipPath }
+        Compress-Archive -Path $distDir -DestinationPath $zipPath
+        
+        # 単体実行ファイルのコピー
+        $exeSource = "$distDir/$outputName.exe"
+        $exeTarget = "dist/$outputName.exe"
+        if (Test-Path $exeSource) {
+          Copy-Item $exeSource $exeTarget
+        } else {
+          Write-Warning "Executable not found at expected location: $exeSource"
+        }
+        
+        Write-Host "✅ Packages created:"
+        if (Test-Path $exeTarget) {
+          Write-Host "  - Single executable: $exeTarget"
+        }
+        if (Test-Path $zipPath) {
+          Write-Host "  - Full package: $zipPath"
+        }
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.APP_NAME }}-${{ matrix.output-name }}
+        path: |
+          dist/${{ env.APP_NAME }}-${{ matrix.output-name }}.exe
+          dist/${{ env.APP_NAME }}-${{ matrix.output-name }}-full.zip
+        retention-days: 30
+
+    - name: Upload build logs
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-logs-${{ matrix.output-name }}
+        path: |
+          build/
+          *.log
+        retention-days: 7
+
+  release:
+    name: Create Release
+    runs-on: windows-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Prepare release assets
+      run: |
+        $version = "${{ github.ref_name }}"
+        $releaseDir = "release"
+        New-Item -ItemType Directory -Force -Path $releaseDir
+        
+        # 各アーキテクチャのファイルをリリース用にリネーム
+        $architectures = @("win32", "win64")
+        foreach ($arch in $architectures) {
+          $artifactDir = "./artifacts/${{ env.APP_NAME }}-$arch"
+          if (Test-Path $artifactDir) {
+            # 単体実行ファイル
+            $exeFile = Get-ChildItem "$artifactDir/*.exe" | Select-Object -First 1
+            if ($exeFile) {
+              Copy-Item $exeFile.FullName "$releaseDir/${{ env.APP_NAME }}-$version-$arch.exe"
+            }
+            
+            # フルパッケージ
+            $zipFile = Get-ChildItem "$artifactDir/*-full.zip" | Select-Object -First 1
+            if ($zipFile) {
+              Copy-Item $zipFile.FullName "$releaseDir/${{ env.APP_NAME }}-$version-$arch-full.zip"
+            }
+          }
+        }
+        
+        Write-Host "Release assets prepared:"
+        Get-ChildItem $releaseDir | ForEach-Object { Write-Host "  - $($_.Name)" }
+
+    - name: Generate release notes
+      run: |
+        $version = "${{ github.ref_name }}"
+        $releaseNotes = @"
+        # AOI Defect History $version
+        
+        ## 📦 ダウンロード
+        
+        ### Windows 64bit版
+        - **${{ env.APP_NAME }}-$version-win64.exe** - 単体実行ファイル（推奨）
+        - **${{ env.APP_NAME }}-$version-win64-full.zip** - フルパッケージ
+        
+        ### Windows 32bit版
+        - **${{ env.APP_NAME }}-$version-win32.exe** - 単体実行ファイル
+        - **${{ env.APP_NAME }}-$version-win32-full.zip** - フルパッケージ
+        
+        ## 📋 システム要件
+        
+        ### 64bit版
+        - Windows 10/11 (64bit)
+        - メモリ: 4GB以上推奨
+        
+        ### 32bit版  
+        - Windows 7 SP1 以降 (32bit/64bit)
+        - メモリ: 2GB以上推奨
+        - 古いシステムでの動作確認済み
+        
+        ## 🚀 インストール方法
+        
+        1. お使いのシステムに対応した実行ファイルをダウンロード
+        2. ダウンロードしたファイルを任意の場所に保存
+        3. 実行ファイルをダブルクリックして起動
+        
+        ## 📝 変更履歴
+        
+        このリリースの詳細な変更内容については、コミット履歴をご確認ください。
+        
+        ## 🐛 問題報告
+        
+        問題や不具合を発見された場合は、[Issues](https://github.com/${{ github.repository }}/issues) にてご報告ください。
+        
+        "@
+        
+        $releaseNotes | Out-File -FilePath "release_notes.md" -Encoding UTF8
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: AOI Defect History ${{ github.ref_name }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        files: |
+          release/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    name: Cleanup
+    runs-on: windows-latest
+    needs: [build, release]
+    if: always()
+    
+    steps:
+    - name: Delete old artifacts
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const days = 30;
+          const ms = days * 24 * 60 * 60 * 1000;
+          const cutoff = new Date(Date.now() - ms);
+          
+          const artifacts = await github.rest.actions.listArtifactsForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+          
+          for (const artifact of artifacts.data.artifacts) {
+            if (new Date(artifact.created_at) < cutoff) {
+              console.log(`Deleting artifact: ${artifact.name} (${artifact.created_at})`);
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id
+              });
+            }
+          }

@@ -1,0 +1,34 @@
+# UTF-8
+#
+# To change this license header, choose License Headers in Project Properties.
+# To change this template file, choose Tools | Templates
+# and open the template in the editor.
+
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 0, 0, 0),
+    prodvers=(1, 0, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'041104B0',
+        [StringStruct(u'CompanyName', u'KTEC'),
+        StringStruct(u'FileDescription', u'AOI Defect History Manager'),
+        StringStruct(u'FileVersion', u'1.0.0.0'),
+        StringStruct(u'InternalName', u'aoi-defect-history'),
+        StringStruct(u'LegalCopyright', u'Copyright (C) 2024 KTEC'),
+        StringStruct(u'OriginalFilename', u'aoi-defect-history.exe'),
+        StringStruct(u'ProductName', u'AOI Defect History'),
+        StringStruct(u'ProductVersion', u'1.0.0.0')])
+      ]), 
+    VarFileInfo([VarStruct(u'Translation', [1041, 1200])])
+  ]
+)
