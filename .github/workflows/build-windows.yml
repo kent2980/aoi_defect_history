@@ -21,7 +21,7 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
-        architecture: ['x64', 'x86']
+        architecture: ['x64']
     
     steps:
     - name: Checkout code
@@ -41,10 +41,6 @@ jobs:
 
     - name: Install dependencies
       run: uv sync --all-extras --dev
-
-    - name: Run 32bit compatibility tests
-      run: uv run python tests/test_32bit_compatibility.py
-      continue-on-error: true
 
     - name: Run basic import test
       run: uv run python -c "import src.aoi_view; print('Import successful')"
@@ -92,10 +88,6 @@ jobs:
             python-version: '3.11'
             target-arch: x64
             output-name: win64
-          - architecture: x86
-            python-version: '3.11'
-            target-arch: x86
-            output-name: win32
     
     steps:
     - name: Checkout code
@@ -163,11 +155,6 @@ jobs:
           "C:\Windows\System32\$dllName"
         )
         
-        # 32bit用の追加検索パス
-        if ($targetArch -eq "x86") {
-          $searchPaths += "C:\Windows\SysWOW64\$dllName"
-        }
-        
         $foundDll = $null
         foreach ($path in $searchPaths) {
           if (Test-Path $path) {
@@ -207,7 +194,6 @@ jobs:
 
     - name: Run pre-build tests
       run: |
-        uv run python tests/validate_32bit_config.py
         uv run python -c "import src.aoi_view; print('Import test passed')"
       continue-on-error: true
 
@@ -287,11 +273,6 @@ jobs:
             "$env:pythonLocation/DLLs/$dllName",
             "C:\Windows\System32\$dllName"
           )
-          
-          # 32bit用の追加検索パス
-          if ($targetArch -eq "x86") {
-            $searchPaths += "C:\Windows\SysWOW64\$dllName"
-          }
           
           $sourceDll = $null
           foreach ($path in $searchPaths) {
@@ -443,7 +424,7 @@ jobs:
         New-Item -ItemType Directory -Force -Path $releaseDir
         
         # 各アーキテクチャのファイルをリリース用にリネーム
-        $architectures = @("win32", "win64")
+        $architectures = @("win64")
         foreach ($arch in $architectures) {
           $artifactDir = "./artifacts/${{ env.APP_NAME }}-$arch"
           if (Test-Path $artifactDir) {
@@ -476,20 +457,10 @@ jobs:
         - **${{ env.APP_NAME }}-$version-win64.exe** - 単体実行ファイル（推奨）
         - **${{ env.APP_NAME }}-$version-win64-full.zip** - フルパッケージ
         
-        ### Windows 32bit版
-        - **${{ env.APP_NAME }}-$version-win32.exe** - 単体実行ファイル
-        - **${{ env.APP_NAME }}-$version-win32-full.zip** - フルパッケージ
-        
         ## 📋 システム要件
         
-        ### 64bit版
         - Windows 10/11 (64bit)
         - メモリ: 4GB以上推奨
-        
-        ### 32bit版  
-        - Windows 7 SP1 以降 (32bit/64bit)
-        - メモリ: 2GB以上推奨
-        - 古いシステムでの動作確認済み
         
         ## 🚀 インストール方法
         

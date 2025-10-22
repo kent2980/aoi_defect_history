@@ -1,8 +1,13 @@
 アプリケーション開始エラー:
-ModeView.__init__() got an unexpected keyword argument 'master'
+AOIView.__init__() got an unexpected keyword argument 'master'
 
 Traceback (most recent call last):
-  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\main.py", line 29, in main
-    mode_view = ModeView(master=root)
-                ^^^^^^^^^^^^^^^^^^^^^
-TypeError: ModeView.__init__() got an unexpected keyword argument 'master'
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\main.py", line 26, in main
+    mode_view = ModeView()
+                ^^^^^^^^^^
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\mode_view.py", line 27, in __init__
+    self.on_manufacture()
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\mode_view.py", line 40, in on_manufacture
+    app = AOIView(master=self, fillColor="red")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: AOIView.__init__() got an unexpected keyword argument 'master'

@@ -33,36 +33,51 @@ class SettingsWindow(tk.Toplevel):
         # 設定ファイルが存在しない場合は新規作成する
         if not settings_path.exists():
             config = configparser.ConfigParser()
-            config["DIRECTORIES"] = {
-                "image_directory": "",
-                "data_directory": "",
-                "schedule_directory": "",
-                "shared_directory": "",
-            }
-            with open(settings_path, "w", encoding="utf-8") as configfile:
-                config.write(configfile)
+            if "DIRECTORIES" not in config:
+                config["DIRECTORIES"] = {
+                    "image_directory": "",
+                    "data_directory": "",
+                    "schedule_directory": "",
+                    "shared_directory": "",
+                }
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
+            else:
+                config["DIRECTORIES"] = {
+                    "image_directory": "",
+                    "data_directory": "",
+                    "schedule_directory": "",
+                    "shared_directory": "",
+                }
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
 
         # 設定ファイルを読み込む
         if settings_path.exists():
             config = configparser.ConfigParser()
             config.read(settings_path, encoding="utf-8")
-            self.current_image_directory = config["DIRECTORIES"].get(
-                "image_directory", ""
-            )
-            self.current_data_directory = config["DIRECTORIES"].get(
-                "data_directory", ""
-            )
-            self.current_schedule_directory = config["DIRECTORIES"].get(
-                "schedule_directory", ""
-            )
-            self.current_shared_directory = config["DIRECTORIES"].get(
-                "shared_directory", ""
-            )
-        else:
-            self.current_image_directory = ""
-            self.current_data_directory = ""
-            self.current_schedule_directory = ""
-            self.current_shared_directory = ""
+            if "DIRECTORIES" in config:
+                self.current_image_directory = config["DIRECTORIES"].get(
+                    "image_directory", ""
+                )
+                self.current_data_directory = config["DIRECTORIES"].get(
+                    "data_directory", ""
+                )
+                self.current_schedule_directory = config["DIRECTORIES"].get(
+                    "schedule_directory", ""
+                )
+                self.current_shared_directory = config["DIRECTORIES"].get(
+                    "shared_directory", ""
+                )
+            else:
+                config["DIRECTORIES"] = {
+                    "image_directory": "",
+                    "data_directory": "",
+                    "schedule_directory": "",
+                    "shared_directory": "",
+                }
+                with open(settings_path, "w", encoding="utf-8") as configfile:
+                    config.write(configfile)
 
     def create_widgets(self):
         # メインフレーム
@@ -77,7 +92,8 @@ class SettingsWindow(tk.Toplevel):
         tk.Label(main_frame, text="画像ディレクトリ:").grid(row=1, column=0, sticky="w")
         self.setting1_entry = tk.Entry(main_frame, width=50)
         self.setting1_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.setting1_entry.insert(0, self.current_image_directory)
+        if hasattr(self, "current_image_directory"):
+            self.setting1_entry.insert(0, self.current_image_directory)
         tk.Button(main_frame, text="参照", command=self.select_image_directory).grid(
             row=1, column=2, padx=5
         )
@@ -88,7 +104,8 @@ class SettingsWindow(tk.Toplevel):
         )
         self.setting2_entry = tk.Entry(main_frame, width=50)
         self.setting2_entry.grid(row=2, column=1, padx=5, pady=5)
-        self.setting2_entry.insert(0, self.current_data_directory)
+        if hasattr(self, "current_data_directory"):
+            self.setting2_entry.insert(0, self.current_data_directory)
         tk.Button(main_frame, text="参照", command=self.select_data_directory).grid(
             row=2, column=2, padx=5
         )
@@ -99,7 +116,8 @@ class SettingsWindow(tk.Toplevel):
         )
         self.setting3_entry = tk.Entry(main_frame, width=50)
         self.setting3_entry.grid(row=3, column=1, padx=5, pady=5)
-        self.setting3_entry.insert(0, self.current_schedule_directory)
+        if hasattr(self, "current_schedule_directory"):
+            self.setting3_entry.insert(0, self.current_schedule_directory)
         tk.Button(main_frame, text="参照", command=self.select_schedule_directory).grid(
             row=3, column=2, padx=5
         )
@@ -108,7 +126,8 @@ class SettingsWindow(tk.Toplevel):
         tk.Label(main_frame, text="共有ディレクトリ:").grid(row=4, column=0, sticky="w")
         self.setting4_entry = tk.Entry(main_frame, width=50)
         self.setting4_entry.grid(row=4, column=1, padx=5, pady=5)
-        self.setting4_entry.insert(0, self.current_shared_directory)
+        if hasattr(self, "current_shared_directory"):
+            self.setting4_entry.insert(0, self.current_shared_directory)
         tk.Button(main_frame, text="参照", command=self.select_shared_directory).grid(
             row=4, column=2, padx=5
         )
