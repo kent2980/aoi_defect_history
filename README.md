@@ -55,6 +55,34 @@ uv run python main.py
 uv run pyinstaller pyinstaller.spec
 ```
 
+### アプリケーションアイコン
+
+アプリケーションアイコンは`assets/icon.ico`に配置されています。
+
+#### アイコンのデザイン
+
+- 基板を拡大鏡で検査しているデザイン
+- 緑色の基板に金色の配線パターン
+- 赤色の不良箇所マーク
+- シルバーの拡大鏡
+
+#### アイコンの変更方法
+
+1. `create_icon.py`スクリプトを編集してデザインを変更
+2. アイコンを再生成:
+
+   ```bash
+   python create_icon.py
+   ```
+
+3. PyInstallerでビルド:
+
+   ```bash
+   uv run pyinstaller pyinstaller.spec
+   ```
+
+または、既存の`.ico`ファイルを`assets/icon.ico`に置き換えてビルドすることもできます。
+
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。

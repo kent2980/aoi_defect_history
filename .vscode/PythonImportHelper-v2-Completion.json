@@ -1,0 +1,1147 @@
+[
+    {
+        "label": "runpy",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "runpy",
+        "description": "runpy",
+        "detail": "runpy",
+        "documentation": {}
+    },
+    {
+        "label": "annotations",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "print_function",
+        "importPath": "__future__",
+        "description": "__future__",
+        "isExtraImport": true,
+        "detail": "__future__",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "site",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "site",
+        "description": "site",
+        "detail": "site",
+        "documentation": {}
+    },
+    {
+        "label": "sys",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sys",
+        "description": "sys",
+        "detail": "sys",
+        "documentation": {}
+    },
+    {
+        "label": "tkinter",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "simpledialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "simpledialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "simpledialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "filedialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "filedialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "messagebox",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "ttk",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "messagebox",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "filedialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "simpledialog",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "ttk",
+        "importPath": "tkinter",
+        "description": "tkinter",
+        "isExtraImport": true,
+        "detail": "tkinter",
+        "documentation": {}
+    },
+    {
+        "label": "FileManager",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "DefectInfo",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "FileManager",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "KintoneClient",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "RepairdInfo",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "SqlOperations",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "FileManager",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "KintoneClient",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "DefectInfo",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "RepairdInfo",
+        "importPath": "aoi_data_manager",
+        "description": "aoi_data_manager",
+        "isExtraImport": true,
+        "detail": "aoi_data_manager",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "configparser",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "configparser",
+        "description": "configparser",
+        "detail": "configparser",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "shutil",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "shutil",
+        "description": "shutil",
+        "detail": "shutil",
+        "documentation": {}
+    },
+    {
+        "label": "threading",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "threading",
+        "description": "threading",
+        "detail": "threading",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "ThreadPoolExecutor",
+        "importPath": "concurrent.futures",
+        "description": "concurrent.futures",
+        "isExtraImport": true,
+        "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
+        "label": "ThreadPoolExecutor",
+        "importPath": "concurrent.futures",
+        "description": "concurrent.futures",
+        "isExtraImport": true,
+        "detail": "concurrent.futures",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Any",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Dict",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "pandas",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pandas",
+        "description": "pandas",
+        "detail": "pandas",
+        "documentation": {}
+    },
+    {
+        "label": "DataFrame",
+        "importPath": "pandas",
+        "description": "pandas",
+        "isExtraImport": true,
+        "detail": "pandas",
+        "documentation": {}
+    },
+    {
+        "label": "DataFrame",
+        "importPath": "pandas",
+        "description": "pandas",
+        "isExtraImport": true,
+        "detail": "pandas",
+        "documentation": {}
+    },
+    {
+        "label": "SMTSchedule",
+        "importPath": "ktec_smt_schedule",
+        "description": "ktec_smt_schedule",
+        "isExtraImport": true,
+        "detail": "ktec_smt_schedule",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageTk",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageTk",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageTk",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageDraw",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageDraw",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "ImageFont",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "asdict",
+        "importPath": "dataclasses",
+        "description": "dataclasses",
+        "isExtraImport": true,
+        "detail": "dataclasses",
+        "documentation": {}
+    },
+    {
+        "label": "subprocess",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "subprocess",
+        "description": "subprocess",
+        "detail": "subprocess",
+        "documentation": {}
+    },
+    {
+        "label": "platform",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "platform",
+        "description": "platform",
+        "detail": "platform",
+        "documentation": {}
+    },
+    {
+        "label": "struct",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "struct",
+        "description": "struct",
+        "detail": "struct",
+        "documentation": {}
+    },
+    {
+        "label": "psutil",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "psutil",
+        "description": "psutil",
+        "detail": "psutil",
+        "documentation": {}
+    },
+    {
+        "label": "numpy",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "numpy",
+        "description": "numpy",
+        "detail": "numpy",
+        "documentation": {}
+    },
+    {
+        "label": "pytest",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pytest",
+        "description": "pytest",
+        "detail": "pytest",
+        "documentation": {}
+    },
+    {
+        "label": "warnings",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "warnings",
+        "description": "warnings",
+        "detail": "warnings",
+        "documentation": {}
+    },
+    {
+        "label": "importlib.util",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "importlib.util",
+        "description": "importlib.util",
+        "detail": "importlib.util",
+        "documentation": {}
+    },
+    {
+        "label": "tempfile",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "tempfile",
+        "description": "tempfile",
+        "detail": "tempfile",
+        "documentation": {}
+    },
+    {
+        "label": "gc",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "gc",
+        "description": "gc",
+        "detail": "gc",
+        "documentation": {}
+    },
+    {
+        "label": "toml",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "toml",
+        "description": "toml",
+        "detail": "toml",
+        "documentation": {}
+    },
+    {
+        "label": "yaml",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "yaml",
+        "description": "yaml",
+        "detail": "yaml",
+        "documentation": {}
+    },
+    {
+        "label": "ModeView",
+        "importPath": "src",
+        "description": "src",
+        "isExtraImport": true,
+        "detail": "src",
+        "documentation": {}
+    },
+    {
+        "label": "bin_dir",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "bin_dir = os.path.dirname(abs_file)\nbase = bin_dir[: -len(\"bin\") - 1]  # strip away the bin part from the __file__, plus the path separator\n# prepend bin to PATH (this file is inside the bin directory)\nos.environ[\"PATH\"] = os.pathsep.join([bin_dir, *os.environ.get(\"PATH\", \"\").split(os.pathsep)])\nos.environ[\"VIRTUAL_ENV\"] = base  # virtual env is right above bin directory\nos.environ[\"VIRTUAL_ENV_PROMPT\"] = \"aoi_defect_history\" or os.path.basename(base)  # noqa: SIM222\n# add the virtual environments libraries to the host python import mechanism\nprev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "base",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "base = bin_dir[: -len(\"bin\") - 1]  # strip away the bin part from the __file__, plus the path separator\n# prepend bin to PATH (this file is inside the bin directory)\nos.environ[\"PATH\"] = os.pathsep.join([bin_dir, *os.environ.get(\"PATH\", \"\").split(os.pathsep)])\nos.environ[\"VIRTUAL_ENV\"] = base  # virtual env is right above bin directory\nos.environ[\"VIRTUAL_ENV_PROMPT\"] = \"aoi_defect_history\" or os.path.basename(base)  # noqa: SIM222\n# add the virtual environments libraries to the host python import mechanism\nprev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))\n    site.addsitedir(path)",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "os.environ[\"PATH\"]",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "os.environ[\"PATH\"] = os.pathsep.join([bin_dir, *os.environ.get(\"PATH\", \"\").split(os.pathsep)])\nos.environ[\"VIRTUAL_ENV\"] = base  # virtual env is right above bin directory\nos.environ[\"VIRTUAL_ENV_PROMPT\"] = \"aoi_defect_history\" or os.path.basename(base)  # noqa: SIM222\n# add the virtual environments libraries to the host python import mechanism\nprev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))\n    site.addsitedir(path)\nsys.path[:] = sys.path[prev_length:] + sys.path[0:prev_length]\nsys.real_prefix = sys.prefix",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "os.environ[\"VIRTUAL_ENV\"]",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "os.environ[\"VIRTUAL_ENV\"] = base  # virtual env is right above bin directory\nos.environ[\"VIRTUAL_ENV_PROMPT\"] = \"aoi_defect_history\" or os.path.basename(base)  # noqa: SIM222\n# add the virtual environments libraries to the host python import mechanism\nprev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))\n    site.addsitedir(path)\nsys.path[:] = sys.path[prev_length:] + sys.path[0:prev_length]\nsys.real_prefix = sys.prefix\nsys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "os.environ[\"VIRTUAL_ENV_PROMPT\"]",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "os.environ[\"VIRTUAL_ENV_PROMPT\"] = \"aoi_defect_history\" or os.path.basename(base)  # noqa: SIM222\n# add the virtual environments libraries to the host python import mechanism\nprev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))\n    site.addsitedir(path)\nsys.path[:] = sys.path[prev_length:] + sys.path[0:prev_length]\nsys.real_prefix = sys.prefix\nsys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "prev_length",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "prev_length = len(sys.path)\nfor lib in \"../lib/python3.11/site-packages\".split(os.pathsep):\n    path = os.path.realpath(os.path.join(bin_dir, lib))\n    site.addsitedir(path)\nsys.path[:] = sys.path[prev_length:] + sys.path[0:prev_length]\nsys.real_prefix = sys.prefix\nsys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "sys.path[:]",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "sys.path[:] = sys.path[prev_length:] + sys.path[0:prev_length]\nsys.real_prefix = sys.prefix\nsys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "sys.real_prefix",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "sys.real_prefix = sys.prefix\nsys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "sys.prefix",
+        "kind": 5,
+        "importPath": ".venv.bin.activate_this",
+        "description": ".venv.bin.activate_this",
+        "peekOfCode": "sys.prefix = base",
+        "detail": ".venv.bin.activate_this",
+        "documentation": {}
+    },
+    {
+        "label": "cmd_doc",
+        "kind": 5,
+        "importPath": ".venv.bin.runxlrd",
+        "description": ".venv.bin.runxlrd",
+        "peekOfCode": "cmd_doc = \"\"\"\nCommands:\n2rows           Print the contents of first and last row in each sheet\n3rows           Print the contents of first, second and last row in each sheet\nbench           Same as \"show\", but doesn't print -- for profiling\nbiff_count[1]   Print a count of each type of BIFF record in the file\nbiff_dump[1]    Print a dump (char and hex) of the BIFF records in the file\nfonts           hdr + print a dump of all font objects\nhdr             Mini-overview of file (no per-sheet information)\nhotshot         Do a hotshot profile run e.g. ... -f1 hotshot bench bigfile*.xls",
+        "detail": ".venv.bin.runxlrd",
+        "documentation": {}
+    },
+    {
+        "label": "options",
+        "kind": 5,
+        "importPath": ".venv.bin.runxlrd",
+        "description": ".venv.bin.runxlrd",
+        "peekOfCode": "options = None\nif __name__ == \"__main__\":\n    import xlrd\n    import sys\n    import time\n    import glob\n    import traceback\n    import gc\n    from xlrd.timemachine import xrange, REPR\n    class LogHandler(object):",
+        "detail": ".venv.bin.runxlrd",
+        "documentation": {}
+    },
+    {
+        "label": "ChangeUserDialog",
+        "kind": 6,
+        "importPath": "src.dialog.change_user_dialog",
+        "description": "src.dialog.change_user_dialog",
+        "peekOfCode": "class ChangeUserDialog(simpledialog.Dialog):\n    def body(self, master):\n        tk.Label(master, text=\"新しいユーザーIDを入力してください。\").grid(\n            row=0, columnspan=2\n        )\n        # ユーザーエントリ\n        tk.Label(master, text=\"ユーザーID:\").grid(row=1, column=0, sticky=\"w\")\n        self.user_entry = tk.Entry(master)\n        self.user_entry.grid(row=1, column=1, padx=5, pady=5)\n        return self.user_entry  # 初期フォーカスをエントリに設定",
+        "detail": "src.dialog.change_user_dialog",
+        "documentation": {}
+    },
+    {
+        "label": "ItemCodeChangeDialog",
+        "kind": 6,
+        "importPath": "src.dialog.item_code_change_dialog",
+        "description": "src.dialog.item_code_change_dialog",
+        "peekOfCode": "class ItemCodeChangeDialog(simpledialog.Dialog):\n    def body(self, master):\n        tk.Label(\n            master,\n            text=\"データが取得できませんでした。新しい品目コードを入力してください。\",\n        ).grid(row=0, columnspan=2)\n        # 品目コードエントリ\n        tk.Label(master, text=\"品目コード:\").grid(row=2, column=0, sticky=\"w\")\n        self.item_code_entry = tk.Entry(master)\n        self.item_code_entry.grid(row=2, column=1, padx=5, pady=5)",
+        "detail": "src.dialog.item_code_change_dialog",
+        "documentation": {}
+    },
+    {
+        "label": "LotChangeDialog",
+        "kind": 6,
+        "importPath": "src.dialog.lot_change_dialog",
+        "description": "src.dialog.lot_change_dialog",
+        "peekOfCode": "class LotChangeDialog(simpledialog.Dialog):\n    def body(self, master):\n        tk.Label(master, text=\"新しい指図を入力してください。\").grid(\n            row=0, columnspan=2\n        )\n        # 指図エントリ\n        tk.Label(master, text=\"指図:\").grid(row=2, column=0, sticky=\"w\")\n        self.lot_entry = tk.Entry(master)\n        self.lot_entry.grid(row=2, column=1, padx=5, pady=5)\n        return self.lot_entry  # 初期フォーカスをエントリに設定",
+        "detail": "src.dialog.lot_change_dialog",
+        "documentation": {}
+    },
+    {
+        "label": "KintoneSettings",
+        "kind": 6,
+        "importPath": "src.sub_window.kintone_settings",
+        "description": "src.sub_window.kintone_settings",
+        "peekOfCode": "class KintoneSettings(tk.Toplevel):\n    \"\"\"キントーン設定ウィンドウ\"\"\"\n    def __init__(self, parent):\n        super().__init__(parent)\n        self.title(\"キントーン設定\")\n        self.geometry(\"400x240\")\n        self.transient(parent)\n        self.grab_set()\n        # ここにキントーン設定用のウィジェットを追加\n        label = tk.Label(self, text=\"キントーンのAPI設定をここに追加してください\")",
+        "detail": "src.sub_window.kintone_settings",
+        "documentation": {}
+    },
+    {
+        "label": "SettingsWindow",
+        "kind": 6,
+        "importPath": "src.sub_window.settings_window",
+        "description": "src.sub_window.settings_window",
+        "peekOfCode": "class SettingsWindow(tk.Toplevel):\n    \"\"\"設定ウィンドウ\"\"\"\n    def __init__(self, parent):\n        super().__init__(parent)\n        print(PROJECT_DIR)\n        self.title(\"設定\")\n        self.transient(parent)\n        self.grab_set()\n        self.result = None\n        self.__read_settings()",
+        "detail": "src.sub_window.settings_window",
+        "documentation": {}
+    },
+    {
+        "label": "PROJECT_DIR",
+        "kind": 5,
+        "importPath": "src.sub_window.settings_window",
+        "description": "src.sub_window.settings_window",
+        "peekOfCode": "PROJECT_DIR = Path(__file__).parent.parent.parent\nclass SettingsWindow(tk.Toplevel):\n    \"\"\"設定ウィンドウ\"\"\"\n    def __init__(self, parent):\n        super().__init__(parent)\n        print(PROJECT_DIR)\n        self.title(\"設定\")\n        self.transient(parent)\n        self.grab_set()\n        self.result = None",
+        "detail": "src.sub_window.settings_window",
+        "documentation": {}
+    },
+    {
+        "label": "AOIView",
+        "kind": 6,
+        "importPath": "src.aoi_view",
+        "description": "src.aoi_view",
+        "peekOfCode": "class AOIView(tk.Toplevel):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"\n        super().__init__(master)",
+        "detail": "src.aoi_view",
+        "documentation": {}
+    },
+    {
+        "label": "PROJECT_DIR",
+        "kind": 5,
+        "importPath": "src.aoi_view",
+        "description": "src.aoi_view",
+        "peekOfCode": "PROJECT_DIR = get_project_dir()\nclass AOIView(tk.Toplevel):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"",
+        "detail": "src.aoi_view",
+        "documentation": {}
+    },
+    {
+        "label": "ModeView",
+        "kind": 6,
+        "importPath": "src.mode_view",
+        "description": "src.mode_view",
+        "peekOfCode": "class ModeView(tk.Tk):\n    def __init__(self):\n        super().__init__()\n        self.title(\"Mode View\")\n        # 画面中央に配置\n        width = 300\n        height = 200\n        self.update_idletasks()\n        screen_width = self.winfo_screenwidth()\n        screen_height = self.winfo_screenheight()",
+        "detail": "src.mode_view",
+        "documentation": {}
+    },
+    {
+        "label": "RepairView",
+        "kind": 6,
+        "importPath": "src.repair_view",
+        "description": "src.repair_view",
+        "peekOfCode": "class RepairView(tk.Toplevel):\n    def __init__(self, fillColor=\"white\", master=None):\n        super().__init__(master)\n        self.title(\"AOI 製品経歴書\")\n        # 最大化表示\n        self.option_add(\"*Background\", \"white\")\n        self.option_add(\"*Entry.Background\", \"white\")\n        self.option_add(\"*Label.Background\", \"white\")\n        self.state(\"zoomed\")\n        self.configure(bg=\"white\")",
+        "detail": "src.repair_view",
+        "documentation": {}
+    },
+    {
+        "label": "SettingsDialog",
+        "kind": 6,
+        "importPath": "src.repair_view",
+        "description": "src.repair_view",
+        "peekOfCode": "class SettingsDialog(simpledialog.Dialog):\n    def __init__(self, parent):\n        self.__read_settings()\n        super().__init__(parent, title=\"設定\")\n    def __read_settings(self):\n        project_dir = get_project_dir()\n        settings_path = get_config_file_path(\"settings.ini\")\n        if settings_path.exists():\n            config = configparser.ConfigParser()\n            config.read(settings_path, encoding=\"utf-8\")",
+        "detail": "src.repair_view",
+        "documentation": {}
+    },
+    {
+        "label": "PROJECT_DIR",
+        "kind": 5,
+        "importPath": "src.repair_view",
+        "description": "src.repair_view",
+        "peekOfCode": "PROJECT_DIR = get_project_dir()\nclass RepairView(tk.Toplevel):\n    def __init__(self, fillColor=\"white\", master=None):\n        super().__init__(master)\n        self.title(\"AOI 製品経歴書\")\n        # 最大化表示\n        self.option_add(\"*Background\", \"white\")\n        self.option_add(\"*Entry.Background\", \"white\")\n        self.option_add(\"*Label.Background\", \"white\")\n        self.state(\"zoomed\")",
+        "detail": "src.repair_view",
+        "documentation": {}
+    },
+    {
+        "label": "Utils",
+        "kind": 6,
+        "importPath": "src.utils",
+        "description": "src.utils",
+        "peekOfCode": "class Utils:\n    @staticmethod\n    def create_repaird_csv_path(data_directory: str, current_lot_number: str) -> str:\n        \"\"\"指図に対応する修理データCSVファイル名を生成\"\"\"\n        if not current_lot_number:\n            raise ValueError(\"Current lot number is not set.\")\n        if not data_directory:\n            raise ValueError(\"Not Setting Data Directory\")\n        filename = f\"{current_lot_number}_repaird_list.csv\"\n        return os.path.join(data_directory, filename)",
+        "detail": "src.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_project_dir",
+        "kind": 2,
+        "importPath": "src.utils",
+        "description": "src.utils",
+        "peekOfCode": "def get_project_dir():\n    \"\"\"\n    プロジェクトディレクトリを取得する\n    実行時環境（開発環境 vs PyInstaller実行ファイル）に応じて\n    適切なディレクトリパスを返す\n    Returns:\n        Path: プロジェクトディレクトリのパス\n    \"\"\"\n    if getattr(sys, \"frozen\", False):\n        # PyInstaller実行ファイルの場合",
+        "detail": "src.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_csv_file_path",
+        "kind": 2,
+        "importPath": "src.utils",
+        "description": "src.utils",
+        "peekOfCode": "def get_csv_file_path(filename):\n    \"\"\"\n    CSVファイルのパスを取得する\n    実行時環境に応じて適切なCSVファイルパスを返す\n    - 開発環境: プロジェクトルート直下\n    - 実行ファイル: 実行ファイルと同じディレクトリ\n    Args:\n        filename (str): CSVファイル名\n    Returns:\n        Path: CSVファイルのパス",
+        "detail": "src.utils",
+        "documentation": {}
+    },
+    {
+        "label": "get_config_file_path",
+        "kind": 2,
+        "importPath": "src.utils",
+        "description": "src.utils",
+        "peekOfCode": "def get_config_file_path(filename):\n    \"\"\"\n    設定ファイルのパスを取得する\n    実行時環境に応じて適切な設定ファイルパスを返す\n    Args:\n        filename (str): 設定ファイル名\n    Returns:\n        Path: 設定ファイルのパス\n    \"\"\"\n    if getattr(sys, \"frozen\", False):",
+        "detail": "src.utils",
+        "documentation": {}
+    },
+    {
+        "label": "run_command",
+        "kind": 2,
+        "importPath": "tests.run_32bit_tests",
+        "description": "tests.run_32bit_tests",
+        "peekOfCode": "def run_command(command, description):\n    \"\"\"コマンドを実行し、結果を表示\"\"\"\n    print(f\"\\n🔄 {description}\")\n    print(f\"実行コマンド: {' '.join(command)}\")\n    print(\"-\" * 50)\n    try:\n        start_time = time.time()\n        result = subprocess.run(\n            command, check=True, capture_output=True, text=True, encoding=\"utf-8\"\n        )",
+        "detail": "tests.run_32bit_tests",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "tests.run_32bit_tests",
+        "description": "tests.run_32bit_tests",
+        "peekOfCode": "def main():\n    \"\"\"メイン実行関数\"\"\"\n    print(\"🔍 32bit Windows対応テスト実行\")\n    print(\"=\" * 60)\n    # システム情報表示\n    python_bits = struct.calcsize(\"P\") * 8\n    print(f\"実行環境: {python_bits}bit Python\")\n    print(f\"Platform: {platform.platform()}\")\n    print(f\"Python: {sys.version}\")\n    print(f\"作業ディレクトリ: {Path.cwd()}\")",
+        "detail": "tests.run_32bit_tests",
+        "documentation": {}
+    },
+    {
+        "label": "Test32BitCompatibility",
+        "kind": 6,
+        "importPath": "tests.test_32bit_compatibility",
+        "description": "tests.test_32bit_compatibility",
+        "peekOfCode": "class Test32BitCompatibility:\n    \"\"\"32bit Windows対応テストクラス\"\"\"\n    def setup_method(self):\n        \"\"\"テスト前の設定\"\"\"\n        self.test_results: Dict[str, Any] = {}\n        self.warnings_list: List[str] = []\n    def test_system_architecture(self):\n        \"\"\"システムアーキテクチャの確認\"\"\"\n        # Pythonのビット数を確認\n        python_bits = struct.calcsize(\"P\") * 8",
+        "detail": "tests.test_32bit_compatibility",
+        "documentation": {}
+    },
+    {
+        "label": "Test32BitPerformance",
+        "kind": 6,
+        "importPath": "tests.test_32bit_performance",
+        "description": "tests.test_32bit_performance",
+        "peekOfCode": "class Test32BitPerformance:\n    \"\"\"32bit Windows パフォーマンステストクラス\"\"\"\n    def __init__(self):\n        self.results: Dict[str, Dict] = {}\n        self.python_bits = struct.calcsize(\"P\") * 8\n        self.is_32bit = self.python_bits == 32\n    def measure_time(self, func, *args, **kwargs):\n        \"\"\"関数の実行時間を測定\"\"\"\n        gc.collect()  # ガベージコレクションを実行\n        start_time = time.perf_counter()",
+        "detail": "tests.test_32bit_performance",
+        "documentation": {}
+    },
+    {
+        "label": "Config32BitValidator",
+        "kind": 6,
+        "importPath": "tests.validate_32bit_config",
+        "description": "tests.validate_32bit_config",
+        "peekOfCode": "class Config32BitValidator:\n    \"\"\"32bit Windows対応設定検証クラス\"\"\"\n    def __init__(self, project_root: Optional[Path] = None):\n        self.project_root = project_root or Path.cwd()\n        self.python_bits = struct.calcsize(\"P\") * 8\n        self.is_32bit = self.python_bits == 32\n        self.issues: List[str] = []\n        self.warnings: List[str] = []\n        self.recommendations: List[str] = []\n    def validate_pyproject_toml(self) -> Dict:",
+        "detail": "tests.validate_32bit_config",
+        "documentation": {}
+    },
+    {
+        "label": "get_system_info",
+        "kind": 2,
+        "importPath": "build_test",
+        "description": "build_test",
+        "peekOfCode": "def get_system_info():\n    \"\"\"システム情報を取得\"\"\"\n    python_bits = struct.calcsize(\"P\") * 8\n    return {\n        \"python_bits\": python_bits,\n        \"platform\": platform.platform(),\n        \"machine\": platform.machine(),\n        \"python_version\": sys.version,\n        \"python_executable\": sys.executable,\n    }",
+        "detail": "build_test",
+        "documentation": {}
+    },
+    {
+        "label": "run_command",
+        "kind": 2,
+        "importPath": "build_test",
+        "description": "build_test",
+        "peekOfCode": "def run_command(command, description, cwd=None):\n    \"\"\"コマンドを実行し、結果を表示\"\"\"\n    print(f\"\\n🔄 {description}\")\n    print(f\"実行コマンド: {' '.join(command)}\")\n    print(\"-\" * 50)\n    try:\n        start_time = time.time()\n        result = subprocess.run(\n            command,\n            check=True,",
+        "detail": "build_test",
+        "documentation": {}
+    },
+    {
+        "label": "test_build_architecture",
+        "kind": 2,
+        "importPath": "build_test",
+        "description": "build_test",
+        "peekOfCode": "def test_build_architecture(target_arch, python_bits):\n    \"\"\"指定されたアーキテクチャでビルドテスト\"\"\"\n    print(f\"\\n{'='*60}\")\n    print(f\"ビルドテスト: {target_arch} アーキテクチャ\")\n    print(f\"{'='*60}\")\n    # 環境変数を設定\n    env = os.environ.copy()\n    env[\"TARGET_ARCH\"] = target_arch\n    arch_name = \"win32\" if target_arch == \"x86\" else \"win64\"\n    # アーキテクチャとPythonの整合性チェック",
+        "detail": "build_test",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "build_test",
+        "description": "build_test",
+        "peekOfCode": "def main():\n    \"\"\"メイン実行関数\"\"\"\n    print(\"🔨 AOI Defect History - Windows実行ファイルビルドテスト\")\n    print(\"=\" * 60)\n    # システム情報表示\n    sys_info = get_system_info()\n    print(f\"Python: {sys_info['python_bits']}bit\")\n    print(f\"Platform: {sys_info['platform']}\")\n    print(f\"Machine: {sys_info['machine']}\")\n    print(f\"Python Version: {sys_info['python_version'].split()[0]}\")",
+        "detail": "build_test",
+        "documentation": {}
+    },
+    {
+        "label": "check_workflow_file",
+        "kind": 2,
+        "importPath": "check_workflow",
+        "description": "check_workflow",
+        "peekOfCode": "def check_workflow_file():\n    \"\"\"GitHub Actionsワークフローファイルの確認\"\"\"\n    workflow_file = Path(\".github/workflows/build-windows.yml\")\n    print(\"🔍 GitHub Actions ワークフロー設定確認\")\n    print(\"=\" * 50)\n    if not workflow_file.exists():\n        print(f\"❌ ワークフローファイルが見つかりません: {workflow_file}\")\n        return False\n    print(f\"✅ ワークフローファイル: {workflow_file}\")\n    try:",
+        "detail": "check_workflow",
+        "documentation": {}
+    },
+    {
+        "label": "check_required_files",
+        "kind": 2,
+        "importPath": "check_workflow",
+        "description": "check_workflow",
+        "peekOfCode": "def check_required_files():\n    \"\"\"必要なファイルの存在確認\"\"\"\n    print(f\"\\n📁 必要ファイル確認:\")\n    required_files = [\n        \"main.py\",\n        \"pyinstaller.spec\",\n        \"version_info.txt\",\n        \"src/aoi_view.py\",\n        \"defect_mapping.csv\",\n        \"user.csv\",",
+        "detail": "check_workflow",
+        "documentation": {}
+    },
+    {
+        "label": "check_pyproject_toml",
+        "kind": 2,
+        "importPath": "check_workflow",
+        "description": "check_workflow",
+        "peekOfCode": "def check_pyproject_toml():\n    \"\"\"pyproject.tomlの確認\"\"\"\n    print(f\"\\n⚙️  pyproject.toml確認:\")\n    pyproject_file = Path(\"pyproject.toml\")\n    if not pyproject_file.exists():\n        print(f\"  ❌ pyproject.toml が見つかりません\")\n        return False\n    try:\n        import toml\n        with open(pyproject_file, \"r\", encoding=\"utf-8\") as f:",
+        "detail": "check_workflow",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "check_workflow",
+        "description": "check_workflow",
+        "peekOfCode": "def main():\n    \"\"\"メイン実行関数\"\"\"\n    print(\"🔍 GitHub Actions ビルド設定確認\")\n    print(\"=\" * 60)\n    results = {\n        \"workflow\": check_workflow_file(),\n        \"files\": check_required_files(),\n        \"pyproject\": check_pyproject_toml(),\n    }\n    print(f\"\\n{'='*60}\")",
+        "detail": "check_workflow",
+        "documentation": {}
+    },
+    {
+        "label": "create_pcb_inspection_icon",
+        "kind": 2,
+        "importPath": "create_icon",
+        "description": "create_icon",
+        "peekOfCode": "def create_pcb_inspection_icon():\n    \"\"\"基板検査をイメージしたアプリケーションアイコンを作成\"\"\"\n    # 最大サイズでアイコンを作成\n    size = 256\n    # 背景色 - ダークグリーン（基板をイメージ）\n    bg_color = (34, 139, 34, 255)  # ForestGreen\n    # 画像を作成\n    img = Image.new(\"RGBA\", (size, size), bg_color)\n    draw = ImageDraw.Draw(img)\n    # === 基板パターンの描画 ===",
+        "detail": "create_icon",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "main",
+        "description": "main",
+        "peekOfCode": "def main():\n    \"\"\"メインエントリーポイント\"\"\"\n    try:\n        # モード選択画面を表示（ModeViewがルートウィンドウとして機能）\n        mode_view = ModeView()\n        # アプリケーション開始\n        mode_view.mainloop()\n    except Exception as e:\n        import traceback\n        error_msg = f\"アプリケーション開始エラー:\\n{str(e)}\\n\\n{traceback.format_exc()}\"",
+        "detail": "main",
+        "documentation": {}
+    }
+]

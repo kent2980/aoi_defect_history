@@ -1,7 +1,7 @@
-import tkinter as tk
-from tkinter import filedialog
 import configparser
+import tkinter as tk
 from pathlib import Path
+from tkinter import filedialog
 
 PROJECT_DIR = Path(__file__).parent.parent.parent
 
@@ -13,7 +13,6 @@ class SettingsWindow(tk.Toplevel):
         super().__init__(parent)
         print(PROJECT_DIR)
         self.title("設定")
-        self.geometry("600x350")
         self.transient(parent)
         self.grab_set()
 

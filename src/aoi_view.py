@@ -1,31 +1,31 @@
-import tkinter as tk
-from tkinter import messagebox, filedialog, ttk
-from PIL import Image, ImageTk
+import configparser
 import os
+import re
+import shutil
+import threading
+import time
+import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
-import configparser
-import pandas as pd
-from pandas import DataFrame
-import re
+from tkinter import filedialog, messagebox, ttk
 from typing import List
-import threading
-import shutil
-from concurrent.futures import ThreadPoolExecutor
-import time
 
+import pandas as pd
 from aoi_data_manager import (
+    DefectInfo,
     FileManager,
     KintoneClient,
-    DefectInfo,
     RepairdInfo,
     SqlOperations,
 )
-from .sub_window import SettingsWindow, KintoneSettings
-from .dialog import LotChangeDialog, ChangeUserDialog, ItemCodeChangeDialog
-from .utils import get_project_dir, get_csv_file_path, get_config_file_path
-from pathlib import Path
 from ktec_smt_schedule import SMTSchedule
+from pandas import DataFrame
+from PIL import Image, ImageTk
+
+from .dialog import ChangeUserDialog, ItemCodeChangeDialog, LotChangeDialog
+from .sub_window import KintoneSettings, SettingsWindow
+from .utils import get_config_file_path, get_csv_file_path, get_project_dir
 
 PROJECT_DIR = get_project_dir()
 
@@ -45,11 +45,11 @@ class AOIView(tk.Toplevel):
 
         # ウィンドウ設定
         self.title("AOI 製品経歴書")  # タイトル設定
-        self.option_add("*Background", "white")  # 背景色を白に設定
-        self.option_add("*Entry.Background", "white")  # Entryの背景色を白に設定
-        self.option_add("*Label.Background", "white")  # Labelの背景色を白に設定
+        # self.option_add("*Background", "white")  # 背景色を白に設定
+        # self.option_add("*Entry.Background", "white")  # Entryの背景色を白に設定
+        # self.option_add("*Label.Background", "white")  # Labelの背景色を白に設定
         self.state("zoomed")  # ウィンドウを最大化
-        self.configure(bg="white")  # 背景色を白に設定
+        # self.configure(bg="white")  # 背景色を白に設定
 
         # ウィンドウの最小サイズを設定
         self.minsize(1200, 800)  # 最小幅1200px、最小高さ800px
@@ -289,7 +289,9 @@ class AOIView(tk.Toplevel):
                 shutil.copy(self.shared_db_path, self.data_directory)
             else:
                 # 新しいデータベースを共有ディレクトリに作成
-                self.shared_sqlite_db = SqlOperations(self.shared_directory, db_name)
+                self.shared_sqlite_db = SqlOperations(
+                    self.shared_directory, self.db_name
+                )
                 self.shared_sqlite_db.create_tables()
         if self.data_directory:
             self.sqlite_db_path = os.path.join(self.data_directory, self.db_name)
