@@ -21,7 +21,7 @@ from aoi_data_manager import (
 )
 from ktec_smt_schedule import SMTSchedule
 from pandas import DataFrame
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from .dialog import ChangeUserDialog, ItemCodeChangeDialog, LotChangeDialog
 from .sub_window import KintoneSettings, SettingsWindow
@@ -1170,8 +1170,10 @@ class AOIView(tk.Toplevel):
         # 座標画像を生成出力
         if self.data_directory:
             output_dir: str = os.path.join(self.data_directory, self.current_lot_number)
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)  # ディレクトリがなければ作成
             filename = f"{current_board_index}_{defect_number}"
-            self.export_canvas_image_with_markers(output_dir, filename)
+            self.export_canvas_image_with_markers(output_dir, filename, rf, defect_name)
 
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
@@ -1832,6 +1834,8 @@ class AOIView(tk.Toplevel):
     def export_canvas_image_with_markers(
         self,
         output_dir: str,
+        reference: str = None,
+        defect_name: str = None,
         filename: str = None,
         marker_size: int = 20,
         marker_color: str = "red",
@@ -1843,6 +1847,8 @@ class AOIView(tk.Toplevel):
 
         Args:
             output_dir (str): 出力先ディレクトリのパス
+            reference (str): リファレンス情報（画像下部に表示）。Noneの場合は表示しない
+            defect_name (str): 不良名（画像下部に表示）。Noneの場合は表示しない
             filename (str): 出力ファイル名（拡張子なし）。Noneの場合は"元ファイル名_marked_タイムスタンプ"を使用
             marker_size (int): マーカーのサイズ（直径、ピクセル単位）デフォルト20
             marker_color (str): マーカーの色（PIL形式: "red", "#FF0000"など）デフォルト"red"
@@ -1901,6 +1907,56 @@ class AOIView(tk.Toplevel):
                 draw.ellipse(
                     [left, top, right, bottom], outline=marker_color, width=2, fill=None
                 )
+
+            # referenceとdefect_nameの描画（指定されている場合）
+            if reference or defect_name:
+                # フォントサイズを画像サイズに応じて調整（最小30、最大80）
+                font_size = max(30, min(80, original_height // 20))
+                try:
+                    # システムフォントを試行（日本語対応）
+                    font = None
+                    # macOS/Linuxの日本語フォント候補
+                    font_candidates = [
+                        "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+                        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                    ]
+                    for font_path in font_candidates:
+                        if os.path.exists(font_path):
+                            font = ImageFont.truetype(font_path, font_size)
+                            break
+
+                    # フォントが見つからない場合はデフォルトフォント
+                    if font is None:
+                        font = ImageFont.load_default()
+                except Exception:
+                    # フォント読み込み失敗時はデフォルトフォント
+                    font = ImageFont.load_default()
+
+                # テキストの構築
+                text_lines = []
+                if reference:
+                    text_lines.append(f"Reference: {reference}")
+                if defect_name:
+                    text_lines.append(f"Defect: {defect_name}")
+
+                # 各行の描画位置を計算
+                line_height = font_size + 10
+                total_text_height = len(text_lines) * line_height + 20  # 上下マージン
+
+                # テキスト背景の矩形を描画（半透明の黒背景）
+                text_bg_top = original_height - total_text_height
+                draw.rectangle(
+                    [0, text_bg_top, original_width, original_height],
+                    fill=(0, 0, 0, 180),
+                )
+
+                # テキストを描画
+                y_position = text_bg_top + 10
+                for text_line in text_lines:
+                    draw.text((10, y_position), text_line, fill="white", font=font)
+                    y_position += line_height
 
             # 出力ファイル名を生成
             file_extension = image_format.lower()
