@@ -21,7 +21,7 @@ from aoi_data_manager import (
 )
 from ktec_smt_schedule import SMTSchedule
 from pandas import DataFrame
-from PIL import Image, ImageTk
+from PIL import Image, ImageDraw, ImageTk
 
 from .dialog import ChangeUserDialog, ItemCodeChangeDialog, LotChangeDialog
 from .sub_window import KintoneSettings, SettingsWindow
@@ -229,9 +229,11 @@ class AOIView(tk.Toplevel):
             """SMTスケジュールを読み込む"""
             try:
                 # ステータスバーの更新
-                self.after(0, lambda: self.update_smt_status("読み込み中...", "orange"))
                 self.after(
-                    0, lambda: self.update_status("SMTスケジュールを読み込み中...")
+                    0, lambda: self.safe_update_smt_status("読み込み中...", "orange")
+                )
+                self.after(
+                    0, lambda: self.safe_update_status("SMTスケジュールを読み込み中...")
                 )
                 # スケジュール情報の取得
                 if self.schedule_directory:
@@ -250,28 +252,27 @@ class AOIView(tk.Toplevel):
 
                     # 成功時のステータスバー更新
                     self.after(
-                        0, lambda: self.update_smt_status("読み込み完了", "green")
+                        0, lambda: self.safe_update_smt_status("読み込み完了", "green")
                     )
                     self.after(
                         0,
-                        lambda: self.update_status(
+                        lambda: self.safe_update_status(
                             "SMTスケジュールの読み込みが完了しました"
                         ),
                     )
                 else:
                     # ディレクトリ未設定時
-                    self.after(0, lambda: self.update_smt_status("未設定", "gray"))
+                    self.after(0, lambda: self.safe_update_smt_status("未設定", "gray"))
                     self.after(
                         0,
-                        lambda: self.update_status(
-                            "スケジュールディレクトリが設定されていません"
+                        lambda: self.safe_update_status(
+                            "設定からディレクトリ設定を完了してください"
                         ),
                     )
-                    print("スケジュールディレクトリが設定されていません。")
             except Exception as e:
                 # エラー時の処理
                 error_msg = f"SMTスケジュール読み込みエラー: {e}"
-                self.after(0, lambda: self.update_smt_status("エラー", "red"))
+                self.after(0, lambda: self.safe_update_smt_status("エラー", "red"))
                 self.after(0, lambda: self.safe_update_status(error_msg))
                 print(error_msg)
 
@@ -282,21 +283,39 @@ class AOIView(tk.Toplevel):
     def __create_sqlite_db(self):
         """SQLiteデータベースを作成"""
         self.db_name = "aoi_data.db"
-        if self.shared_directory:
-            self.shared_db_path = os.path.join(self.shared_directory, self.db_name)
-            if os.path.exists(self.shared_db_path):
-                # 共有データをローカルにコピー
-                shutil.copy(self.shared_db_path, self.data_directory)
-            else:
-                # 新しいデータベースを共有ディレクトリに作成
-                self.shared_sqlite_db = SqlOperations(
-                    self.shared_directory, self.db_name
-                )
-                self.shared_sqlite_db.create_tables()
-        if self.data_directory:
-            self.sqlite_db_path = os.path.join(self.data_directory, self.db_name)
-            self.sqlite_db = SqlOperations(self.data_directory, self.db_name)
-            self.sqlite_db.create_tables()
+        db_connected = False
+        db_type = "local"
+
+        try:
+            if self.shared_directory:
+                self.shared_db_path = os.path.join(self.shared_directory, self.db_name)
+                if os.path.exists(self.shared_db_path):
+                    # 共有データをローカルにコピー
+                    shutil.copy(self.shared_db_path, self.data_directory)
+                    db_type = "共有"
+                else:
+                    # 新しいデータベースを共有ディレクトリに作成
+                    self.shared_sqlite_db = SqlOperations(
+                        self.shared_directory, self.db_name
+                    )
+                    self.shared_sqlite_db.create_tables()
+                    db_type = "共有"
+
+            if self.data_directory:
+                self.sqlite_db_path = os.path.join(self.data_directory, self.db_name)
+                self.sqlite_db = SqlOperations(self.data_directory, self.db_name)
+                self.sqlite_db.create_tables()
+                db_connected = True
+
+                # 接続状態をステータスバーに反映（UIスレッドで実行）
+                if hasattr(self, "sqlite_status_label"):
+                    self.after(
+                        0, lambda: self.safe_update_sqlite_status(db_connected, db_type)
+                    )
+        except Exception as e:
+            print(f"SQLiteデータベース作成エラー: {e}")
+            if hasattr(self, "sqlite_status_label"):
+                self.after(0, lambda: self.safe_update_sqlite_status(False, db_type))
 
     def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
         """不良情報を非同期でSQLiteデータベースに挿入"""
@@ -345,11 +364,11 @@ class AOIView(tk.Toplevel):
                 connected = self.kintone_client.is_connected()
                 self.is_kintone_connected = connected
                 status_msg = "キントーン接続済み" if connected else "キントーン未接続"
-                self.after(0, lambda: self.update_connection_status(connected))
+                self.after(0, lambda: self.safe_update_connection_status(connected))
                 self.after(0, lambda: self.safe_update_status(status_msg))
             except Exception as e:
                 error_msg = f"キントーン接続エラー: {e}"
-                self.after(0, lambda: self.update_connection_status(False))
+                self.after(0, lambda: self.safe_update_connection_status(False))
                 self.after(0, lambda: self.safe_update_status(error_msg))
                 print(error_msg)
 
@@ -668,6 +687,15 @@ class AOIView(tk.Toplevel):
         )
         self.smt_status_label.pack(side=tk.RIGHT, padx=10)
 
+        # SQLite接続状態インジケータ
+        self.sqlite_status_label = tk.Label(
+            self.status_right_frame,
+            text="● SQLite: 未接続",
+            font=("Yu Gothic UI", 9),
+            fg="gray",
+        )
+        self.sqlite_status_label.pack(side=tk.RIGHT, padx=10)
+
         # 接続状況インジケータ
         self.connection_label = tk.Label(
             self.status_right_frame, text="● 未接続", font=("Yu Gothic UI", 9), fg="red"
@@ -705,6 +733,14 @@ class AOIView(tk.Toplevel):
         except tk.TclError:
             pass
 
+    def safe_update_smt_status(self, status: str, color: str = "black"):
+        """安全なSMTスケジュール読み込み状況更新（非同期処理用）"""
+        try:
+            if hasattr(self, "winfo_exists") and self.winfo_exists():
+                self.update_smt_status(status, color)
+        except (tk.TclError, AttributeError):
+            pass
+
     def update_connection_status(self, connected: bool):
         """接続状況を更新"""
         try:
@@ -719,6 +755,37 @@ class AOIView(tk.Toplevel):
                 else:
                     self.connection_label.config(text="● キントーンAPIエラー", fg="red")
         except tk.TclError:
+            pass
+
+    def safe_update_connection_status(self, connected: bool):
+        """安全な接続状況更新（非同期処理用）"""
+        try:
+            if hasattr(self, "winfo_exists") and self.winfo_exists():
+                self.update_connection_status(connected)
+        except (tk.TclError, AttributeError):
+            pass
+
+    def update_sqlite_status(self, connected: bool, db_type: str = "local"):
+        """SQLite接続状況を更新"""
+        try:
+            if (
+                hasattr(self, "sqlite_status_label")
+                and self.sqlite_status_label.winfo_exists()
+            ):
+                if connected:
+                    status_text = f"● SQLite: {db_type}接続済み"
+                    self.sqlite_status_label.config(text=status_text, fg="green")
+                else:
+                    self.sqlite_status_label.config(text="● SQLite: エラー", fg="red")
+        except tk.TclError:
+            pass
+
+    def safe_update_sqlite_status(self, connected: bool, db_type: str = "local"):
+        """安全なSQLite接続状況更新（非同期処理用）"""
+        try:
+            if hasattr(self, "winfo_exists") and self.winfo_exists():
+                self.update_sqlite_status(connected, db_type)
+        except (tk.TclError, AttributeError):
             pass
 
     def on_window_resize(self, event):
@@ -1100,6 +1167,12 @@ class AOIView(tk.Toplevel):
         else:
             self.defect_list_insert(defect)
 
+        # 座標画像を生成出力
+        if self.data_directory:
+            output_dir: str = os.path.join(self.data_directory, self.current_lot_number)
+            filename = f"{current_board_index}_{defect_number}"
+            self.export_canvas_image_with_markers(output_dir, filename)
+
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
         self.defect_entry.delete(0, tk.END)
@@ -1394,6 +1467,12 @@ class AOIView(tk.Toplevel):
             self.__read_smt_schedule_async()
             # ディレクトリ未設定アラート表示
             self.__alert_not_directory_settings()
+            # SQLite接続状態を更新
+            if self.sqlite_db:
+                db_type = "共有" if self.shared_directory else "ローカル"
+                self.safe_update_sqlite_status(True, db_type)
+            else:
+                self.safe_update_sqlite_status(False, "")
             # 設定ファイルが存在しない場合は新規作成
             settings_path = get_config_file_path("settings.ini")
             if not settings_path.exists():
@@ -1419,10 +1498,10 @@ class AOIView(tk.Toplevel):
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
 
-            messagebox.showinfo(
-                "Info",
-                f"新しい設定: {new_settings[0]}, {new_settings[1]}, {new_settings[2]} に変更されました。",
-            )
+            # messagebox.showinfo(
+            #     "Info",
+            #     f"新しい設定: {new_settings[0]}, {new_settings[1]}, {new_settings[2]} に変更されました。",
+            # )
         else:
             messagebox.showinfo("Info", "設定の変更がキャンセルされました。")
 
@@ -1749,3 +1828,142 @@ class AOIView(tk.Toplevel):
         # 別スレッドで非同期処理
         thread = threading.Thread(target=_delete_request, daemon=True)
         thread.start()
+
+    def export_canvas_image_with_markers(
+        self,
+        output_dir: str,
+        filename: str = None,
+        marker_size: int = 20,
+        marker_color: str = "red",
+        image_format: str = "PNG",
+        quality: int = 95,
+    ):
+        """
+        Canvas内の画像に座標マーカーを描画した状態で画像を生成し、指定したディレクトリに保存する
+
+        Args:
+            output_dir (str): 出力先ディレクトリのパス
+            filename (str): 出力ファイル名（拡張子なし）。Noneの場合は"元ファイル名_marked_タイムスタンプ"を使用
+            marker_size (int): マーカーのサイズ（直径、ピクセル単位）デフォルト20
+            marker_color (str): マーカーの色（PIL形式: "red", "#FF0000"など）デフォルト"red"
+            image_format (str): 画像フォーマット（"PNG", "JPEG", "BMP"など）デフォルト"PNG"
+            quality (int): 画像品質（1-100、JPEGの場合は品質、PNGの場合は圧縮レベル0-9に変換）デフォルト95
+
+        Returns:
+            str: 保存した画像のパス（保存に失敗した場合はNone）
+        """
+        # 画像が開かれていない場合は終了
+        if not self.current_image_path or not os.path.exists(self.current_image_path):
+            self.safe_update_status(
+                "画像が開かれていないため、エクスポートできません。"
+            )
+            return None
+
+        # 不良データが存在しない場合は終了
+        if not self.defect_list:
+            self.safe_update_status(
+                "座標データが存在しないため、エクスポートできません。"
+            )
+            return None
+
+        # 出力ディレクトリの作成
+        output_path = Path(output_dir)
+        if not output_path.exists():
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                error_msg = f"出力ディレクトリの作成に失敗しました: {e}"
+                self.safe_update_status(error_msg)
+                return None
+
+        try:
+            # 元の画像を開く
+            original_image = Image.open(self.current_image_path)
+            original_width, original_height = original_image.size
+
+            # 描画オブジェクトを作成
+            draw = ImageDraw.Draw(original_image)
+
+            # 各不良のマーカーを描画
+            marker_radius = marker_size // 2
+            for defect in self.defect_list:
+                # 相対座標を実際のピクセル座標に変換
+                pixel_x = defect.x * original_width
+                pixel_y = defect.y * original_height
+
+                # 楕円（マーカー）の境界ボックスを計算
+                left = pixel_x - marker_radius
+                top = pixel_y - marker_radius
+                right = pixel_x + marker_radius
+                bottom = pixel_y + marker_radius
+
+                # マーカーを描画（外枠と塗りつぶし）
+                draw.ellipse(
+                    [left, top, right, bottom], outline=marker_color, width=2, fill=None
+                )
+
+            # 出力ファイル名を生成
+            file_extension = image_format.lower()
+            if filename:
+                # ユーザー指定のファイル名を使用（拡張子は除去）
+                base_filename = Path(filename).stem
+                output_filename = f"{base_filename}.{file_extension}"
+            else:
+                # デフォルト: 元ファイル名 + タイムスタンプ
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                original_filename = Path(self.current_image_path).stem
+                output_filename = (
+                    f"{original_filename}_marked_{timestamp}.{file_extension}"
+                )
+
+            output_filepath = output_path / output_filename
+
+            # 画像形式に応じた保存オプションを設定
+            save_kwargs = {}
+            if image_format.upper() == "JPEG" or image_format.upper() == "JPG":
+                # JPEG: 品質を1-100で指定
+                save_kwargs["quality"] = max(1, min(100, quality))
+                save_kwargs["optimize"] = True
+                # JPEGはRGBモードが必要
+                if original_image.mode in ("RGBA", "LA", "P"):
+                    # 透明度がある場合は白背景に合成
+                    background = Image.new("RGB", original_image.size, (255, 255, 255))
+                    if original_image.mode == "P":
+                        original_image = original_image.convert("RGBA")
+                    background.paste(
+                        original_image,
+                        mask=(
+                            original_image.split()[-1]
+                            if original_image.mode in ("RGBA", "LA")
+                            else None
+                        ),
+                    )
+                    original_image = background
+                elif original_image.mode != "RGB":
+                    original_image = original_image.convert("RGB")
+            elif image_format.upper() == "PNG":
+                # PNG: 圧縮レベルを0-9で指定（qualityを100段階から9段階に変換）
+                compress_level = max(0, min(9, int((100 - quality) / 11)))
+                save_kwargs["compress_level"] = compress_level
+                save_kwargs["optimize"] = True
+            elif image_format.upper() == "BMP":
+                # BMP: 特別なオプションなし
+                pass
+            else:
+                # その他のフォーマット: 基本設定
+                if image_format.upper() in ("TIFF", "TIF"):
+                    save_kwargs["compression"] = "tiff_lzw"
+
+            # 画像を保存
+            original_image.save(
+                output_filepath, format=image_format.upper(), **save_kwargs
+            )
+
+            success_msg = f"画像を保存しました: {output_filepath}"
+            self.safe_update_status(success_msg)
+            return str(output_filepath)
+
+        except Exception as e:
+            error_msg = f"画像のエクスポートに失敗しました: {e}"
+            self.safe_update_status(error_msg)
+            return None

@@ -16,17 +16,36 @@ else:
 # モジュールパスの追加
 sys.path.append(str(PROJECT_DIR / "src"))
 
-from src import ModeView
+from src import AOIView
 
 
 def main():
     """メインエントリーポイント"""
     try:
-        # モード選択画面を表示（ModeViewがルートウィンドウとして機能）
-        mode_view = ModeView()
+        # ルートウィンドウを作成（非表示）
+        root = tk.Tk()
+        root.withdraw()  # ルートウィンドウは非表示
+
+        # AOIViewを作成（UIはまだ作成されない）
+        aoi_view = None
+
+        def initialize_aoi_view():
+            """メインループ開始後にAOIViewを初期化"""
+            nonlocal aoi_view
+            aoi_view = AOIView(master=root, fillColor="red")
+
+            # AOIViewが閉じられたらアプリケーション終了
+            def on_aoi_close():
+                root.quit()
+                root.destroy()
+
+            aoi_view.protocol("WM_DELETE_WINDOW", on_aoi_close)
+
+        # メインループ開始後にAOIViewを初期化
+        root.after(100, initialize_aoi_view)
 
         # アプリケーション開始
-        mode_view.mainloop()
+        root.mainloop()
 
     except Exception as e:
         import traceback
