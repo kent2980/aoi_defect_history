@@ -169,6 +169,22 @@ class AOIView(tk.Toplevel):
         # ユーザー切り替え
         self.change_user()
 
+        # ディレクトリ未設定アラート表示
+        self.__alert_not_directory_settings()
+
+    def __alert_not_directory_settings(self):
+        """ディレクトリ未設定アラート表示"""
+        if (
+            self.image_directory == ""
+            or self.data_directory == ""
+            or self.schedule_directory == ""
+            or self.shared_directory == ""
+        ):
+            messagebox.showwarning(
+                "ディレクトリ未設定",
+                "いずれかのディレクトリが設定されていません。設定ウィンドウでディレクトリを設定してください。",
+            )
+
     def __before_close(self):
         """閉じる前の処理"""
         if len(self.defect_list) > 0:
@@ -178,7 +194,7 @@ class AOIView(tk.Toplevel):
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
             # データベースにアイテムを追加
-            self.__insert_defect_info_to_db(self.defect_list)
+            self.__insert_defect_info_to_db_async(self.defect_list)
             # SQLiteデータベースを閉じる
             self.sqlite_db.close()
             # 差分を共有データベースにマージ
@@ -194,13 +210,17 @@ class AOIView(tk.Toplevel):
             # 設定ファイルを読み込み
             config = configparser.ConfigParser()
             config.read(settings_path, encoding="utf-8")
-            # 例: 画像ディレクトリとデータディレクトリを取得
-            self.image_directory = config["DIRECTORIES"].get("image_directory", "")
-            self.data_directory = config["DIRECTORIES"].get("data_directory", "")
-            self.schedule_directory = config["DIRECTORIES"].get(
-                "schedule_directory", ""
-            )
-            self.shared_directory = config["DIRECTORIES"].get("shared_directory", "")
+            # config["DIRECTORIES"]が存在する場合
+            if "DIRECTORIES" in config:
+                # 例: 画像ディレクトリとデータディレクトリを取得
+                self.image_directory = config["DIRECTORIES"].get("image_directory", "")
+                self.data_directory = config["DIRECTORIES"].get("data_directory", "")
+                self.schedule_directory = config["DIRECTORIES"].get(
+                    "schedule_directory", ""
+                )
+                self.shared_directory = config["DIRECTORIES"].get(
+                    "shared_directory", ""
+                )
 
     def __read_smt_schedule_async(self):
         """SMTスケジュールを非同期で読み込み"""
@@ -276,21 +296,32 @@ class AOIView(tk.Toplevel):
             self.sqlite_db = SqlOperations(self.data_directory, self.db_name)
             self.sqlite_db.create_tables()
 
-    def __insert_defect_info_to_db(self, defect_info: List[DefectInfo]):
-        """不良情報をSQLiteデータベースに挿入"""
-        if self.sqlite_db:
-            try:
-                self.sqlite_db.merge_insert_defect_infos(defect_info)
-            except Exception as e:
-                print(f"データベースマージ挿入エラー: {e}")
+    def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
+        """不良情報を非同期でSQLiteデータベースに挿入"""
 
-    def __remove_defect_info_from_db(self, defect_info: DefectInfo):
-        """不良情報をSQLiteデータベースから削除"""
-        if self.sqlite_db:
-            try:
-                self.sqlite_db.delete_defect_info(defect_info.id)
-            except Exception as e:
-                print(f"データベース削除エラー: {e}")
+        def _task():
+            """非同期挿入タスク"""
+            if self.sqlite_db:
+                try:
+                    self.sqlite_db.merge_insert_defect_infos(defect_info)
+                except Exception as e:
+                    print(f"データベースマージ挿入エラー: {e}")
+
+        thread = threading.Thread(target=_task, daemon=True)
+        thread.start()
+
+    def __remove_defect_info_from_db_async(self, defect_info: DefectInfo):
+        """不良情報を非同期でSQLiteデータベースから削除"""
+
+        def _task():
+            if self.sqlite_db:
+                try:
+                    self.sqlite_db.delete_defect_info(defect_info.id)
+                except Exception as e:
+                    print(f"データベース削除エラー: {e}")
+
+        thread = threading.Thread(target=_task, daemon=True)
+        thread.start()
 
     def init_kintone_client(self):
         """キントーンクライアントの初期化"""
@@ -1075,7 +1106,7 @@ class AOIView(tk.Toplevel):
         self.canvas.delete("coordinate_marker")
 
         # sqlteデータベースに登録
-        self.__insert_defect_info_to_db(self.defect_list)
+        self.__insert_defect_info_to_db_async(self.defect_list)
 
         # キントーンにデータを登録
         self.post_kintone_record_async(self.defect_list)
@@ -1094,7 +1125,7 @@ class AOIView(tk.Toplevel):
             self.rf_entry.delete(0, tk.END)
             self.defect_entry.delete(0, tk.END)
             # データベースから削除
-            self.__remove_defect_info_from_db(defect_item)
+            self.__remove_defect_info_from_db_async(defect_item)
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
@@ -1204,7 +1235,7 @@ class AOIView(tk.Toplevel):
             return
 
         # データベースにアイテムを追加
-        self.__insert_defect_info_to_db(self.defect_list)
+        self.__insert_defect_info_to_db_async(self.defect_list)
 
         # 画面を更新
         self.current_board_index = self.current_board_index + 1
@@ -1355,6 +1386,12 @@ class AOIView(tk.Toplevel):
             self.image_directory = new_settings[0]
             self.data_directory = new_settings[1]
             self.schedule_directory = new_settings[2]
+            self.shared_directory = new_settings[3]
+            # 設定を読み込む
+            self.__create_sqlite_db()
+            self.__read_smt_schedule_async()
+            # ディレクトリ未設定アラート表示
+            self.__alert_not_directory_settings()
             # 設定ファイルが存在しない場合は新規作成
             settings_path = get_config_file_path("settings.ini")
             if not settings_path.exists():
@@ -1422,7 +1459,7 @@ class AOIView(tk.Toplevel):
         # defect_listをCSVに保存
         if len(self.defect_list) > 0:
             # データベースにアイテムを追加
-            self.__insert_defect_info_to_db(self.defect_list)
+            self.__insert_defect_info_to_db_async(self.defect_list)
 
         # すべての座標マーカーを削除
         self.canvas.delete("all")
