@@ -13,7 +13,7 @@ class SettingsWindow(tk.Toplevel):
         super().__init__(parent)
         print(PROJECT_DIR)
         self.title("設定")
-        self.geometry("600x250")
+        self.geometry("600x350")
         self.transient(parent)
         self.grab_set()
 
@@ -37,6 +37,7 @@ class SettingsWindow(tk.Toplevel):
                 "image_directory": "",
                 "data_directory": "",
                 "schedule_directory": "",
+                "shared_directory": "",
             }
             with open(settings_path, "w", encoding="utf-8") as configfile:
                 config.write(configfile)
@@ -54,10 +55,14 @@ class SettingsWindow(tk.Toplevel):
             self.current_schedule_directory = config["DIRECTORIES"].get(
                 "schedule_directory", ""
             )
+            self.current_shared_directory = config["DIRECTORIES"].get(
+                "shared_directory", ""
+            )
         else:
             self.current_image_directory = ""
             self.current_data_directory = ""
             self.current_schedule_directory = ""
+            self.current_shared_directory = ""
 
     def create_widgets(self):
         # メインフレーム
@@ -99,9 +104,18 @@ class SettingsWindow(tk.Toplevel):
             row=3, column=2, padx=5
         )
 
+        # 共有ディレクトリ設定
+        tk.Label(main_frame, text="共有ディレクトリ:").grid(row=4, column=0, sticky="w")
+        self.setting4_entry = tk.Entry(main_frame, width=50)
+        self.setting4_entry.grid(row=4, column=1, padx=5, pady=5)
+        self.setting4_entry.insert(0, self.current_shared_directory)
+        tk.Button(main_frame, text="参照", command=self.select_shared_directory).grid(
+            row=4, column=2, padx=5
+        )
+
         # ボタンフレーム
         button_frame = tk.Frame(main_frame)
-        button_frame.grid(row=4, columnspan=3, pady=20)
+        button_frame.grid(row=5, columnspan=3, pady=20)
 
         # OKボタン
         ok_button = tk.Button(
@@ -146,11 +160,18 @@ class SettingsWindow(tk.Toplevel):
             self.setting3_entry.delete(0, tk.END)
             self.setting3_entry.insert(0, directory)
 
+    def select_shared_directory(self):
+        directory = filedialog.askdirectory(title="共有ディレクトリを選択してください")
+        if directory:
+            self.setting4_entry.delete(0, tk.END)
+            self.setting4_entry.insert(0, directory)
+
     def ok_clicked(self):
         self.result = (
             self.setting1_entry.get(),
             self.setting2_entry.get(),
             self.setting3_entry.get(),
+            self.setting4_entry.get(),
         )
         self.destroy()
 
