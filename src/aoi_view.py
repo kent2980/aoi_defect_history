@@ -30,7 +30,7 @@ from .utils import get_config_file_path, get_csv_file_path, get_project_dir
 PROJECT_DIR = get_project_dir()
 
 
-class AOIView(tk.Toplevel):
+class AOIView(tk.Tk):
     """AOI製品経歴書ウィンドウ"""
 
     def __init__(self, fillColor="white", master=None):
@@ -41,7 +41,7 @@ class AOIView(tk.Toplevel):
         - fillColor (str): 塗りつぶし色
         - master (tk.Tk): 親ウィンドウ
         """
-        super().__init__(master)
+        super().__init__()
 
         # ウィンドウ設定
         self.title("AOI 製品経歴書")  # タイトル設定
@@ -121,6 +121,7 @@ class AOIView(tk.Toplevel):
         # データリスト
         self.defect_list: List[DefectInfo] = []
         self.repaird_list: List[RepairdInfo] = []
+        self.delete_defect_ids: List[str] = []
 
         # 基板番号
         self.current_board_index = 1
@@ -132,13 +133,12 @@ class AOIView(tk.Toplevel):
         # 設定読み込み
         self.__read_settings()
 
-        # sqlite3データベース
+        # sqlite3データベース（UI作成前に変数のみ初期化）
         self.db_name = None
         self.sqlite_db = None
         self.shared_sqlite_db = None
-        self.sqlite_db_path = None
+        self.sqlite_db_dir = None
         self.shared_db_path = None
-        self.__create_sqlite_db()
 
         # UIの作成
         self.create_ui()
@@ -147,9 +147,6 @@ class AOIView(tk.Toplevel):
         """UI要素を作成する"""
         # Kintoneクライアントの初期化
         self.init_kintone_client()
-
-        # キントーン接続確認（非同期）
-        self.kintone_connected_async()
 
         # UI描画
         self.create_menu()
@@ -160,8 +157,8 @@ class AOIView(tk.Toplevel):
         self.create_defect_list_widgets()
         self.create_status_bar()
 
-        # SMTスケジュール非同期読み込み開始（ステータスバー作成後）
-        self.__read_smt_schedule_async()
+        # SQLiteデータベース作成（ステータスバー作成後）
+        self.__create_sqlite_db()
 
         # 基板ラベルの初期化
         self.update_board_label()
@@ -171,6 +168,20 @@ class AOIView(tk.Toplevel):
 
         # ディレクトリ未設定アラート表示
         self.__alert_not_directory_settings()
+
+    def run(self):
+        """アプリケーションを起動してメインループを実行"""
+        # メインループ開始後に非同期処理を開始
+        self.after_idle(self._start_background_tasks)
+        # メインループ開始
+        self.mainloop()
+
+    def _start_background_tasks(self):
+        """バックグラウンドタスクを開始（メインループ開始後に実行）"""
+        # キントーン接続確認（非同期）
+        self.kintone_connected_async()
+        # SMTスケジュール非同期読み込み開始
+        self.__read_smt_schedule_async()
 
     def __alert_not_directory_settings(self):
         """ディレクトリ未設定アラート表示"""
@@ -196,10 +207,16 @@ class AOIView(tk.Toplevel):
             # データベースにアイテムを追加
             self.__insert_defect_info_to_db_async(self.defect_list)
             # SQLiteデータベースを閉じる
-            self.sqlite_db.close()
-            # 差分を共有データベースにマージ
+            if self.sqlite_db:
+                self.sqlite_db.close()
+        # 差分を共有データベースにマージ
+        if self.sqlite_db_dir and self.shared_directory and self.db_name:
+            # マージ処理の実行
             SqlOperations.merge_target_database(
-                self.data_directory, self.shared_directory, self.db_name
+                self.sqlite_db_dir,
+                self.shared_directory,
+                self.db_name,
+                delete_defect_ids=self.delete_defect_ids,
             )
         self.destroy()
 
@@ -229,12 +246,8 @@ class AOIView(tk.Toplevel):
             """SMTスケジュールを読み込む"""
             try:
                 # ステータスバーの更新
-                self.after(
-                    0, lambda: self.safe_update_smt_status("読み込み中...", "orange")
-                )
-                self.after(
-                    0, lambda: self.safe_update_status("SMTスケジュールを読み込み中...")
-                )
+                self.safe_update_smt_status("読み込み中...", "orange")
+                self.safe_update_status("SMTスケジュールを読み込み中...")
                 # スケジュール情報の取得
                 if self.schedule_directory:
                     # スケジュール情報のDataFrame取得
@@ -251,29 +264,19 @@ class AOIView(tk.Toplevel):
                     )
 
                     # 成功時のステータスバー更新
-                    self.after(
-                        0, lambda: self.safe_update_smt_status("読み込み完了", "green")
-                    )
-                    self.after(
-                        0,
-                        lambda: self.safe_update_status(
-                            "SMTスケジュールの読み込みが完了しました"
-                        ),
-                    )
+                    self.safe_update_smt_status("読み込み完了", "green")
+                    self.safe_update_status("SMTスケジュールの読み込みが完了しました")
                 else:
                     # ディレクトリ未設定時
-                    self.after(0, lambda: self.safe_update_smt_status("未設定", "gray"))
-                    self.after(
-                        0,
-                        lambda: self.safe_update_status(
-                            "設定からディレクトリ設定を完了してください"
-                        ),
+                    self.safe_update_smt_status("未設定", "gray")
+                    self.safe_update_status(
+                        "設定からディレクトリ設定を完了してください"
                     )
             except Exception as e:
                 # エラー時の処理
                 error_msg = f"SMTスケジュール読み込みエラー: {e}"
-                self.after(0, lambda: self.safe_update_smt_status("エラー", "red"))
-                self.after(0, lambda: self.safe_update_status(error_msg))
+                self.safe_update_smt_status("エラー", "red")
+                self.safe_update_status(error_msg)
                 print(error_msg)
 
         # バックグラウンドスレッドで実行
@@ -285,13 +288,14 @@ class AOIView(tk.Toplevel):
         self.db_name = "aoi_data.db"
         db_connected = False
         db_type = "local"
+        self.sqlite_db_dir = PROJECT_DIR
 
         try:
             if self.shared_directory:
                 self.shared_db_path = os.path.join(self.shared_directory, self.db_name)
                 if os.path.exists(self.shared_db_path):
                     # 共有データをローカルにコピー
-                    shutil.copy(self.shared_db_path, self.data_directory)
+                    shutil.copy(self.shared_db_path, self.sqlite_db_dir)
                     db_type = "共有"
                 else:
                     # 新しいデータベースを共有ディレクトリに作成
@@ -301,21 +305,16 @@ class AOIView(tk.Toplevel):
                     self.shared_sqlite_db.create_tables()
                     db_type = "共有"
 
-            if self.data_directory:
-                self.sqlite_db_path = os.path.join(self.data_directory, self.db_name)
-                self.sqlite_db = SqlOperations(self.data_directory, self.db_name)
-                self.sqlite_db.create_tables()
-                db_connected = True
+            # ローカルデータベースの作成
+            self.sqlite_db = SqlOperations(self.sqlite_db_dir, self.db_name)
+            self.sqlite_db.create_tables()
+            db_connected = True
 
-                # 接続状態をステータスバーに反映（UIスレッドで実行）
-                if hasattr(self, "sqlite_status_label"):
-                    self.after(
-                        0, lambda: self.safe_update_sqlite_status(db_connected, db_type)
-                    )
+            # 接続状態をステータスバーに反映
+            self.safe_update_sqlite_status(db_connected, db_type)
         except Exception as e:
             print(f"SQLiteデータベース作成エラー: {e}")
-            if hasattr(self, "sqlite_status_label"):
-                self.after(0, lambda: self.safe_update_sqlite_status(False, db_type))
+            self.safe_update_sqlite_status(False, db_type)
 
     def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
         """不良情報を非同期でSQLiteデータベースに挿入"""
@@ -717,19 +716,16 @@ class AOIView(tk.Toplevel):
         try:
             # ウィンドウ自体が存在するかチェック
             if hasattr(self, "winfo_exists") and self.winfo_exists():
-                self.update_status(message)
-        except (tk.TclError, AttributeError):
+                # メインスレッドで実行
+                self.after(0, lambda: self.update_status(message))
+        except (tk.TclError, AttributeError, RuntimeError):
             # ウィンドウが既に破棄されている場合は何もしない
             pass
 
     def update_smt_status(self, status: str, color: str = "black"):
         """SMTスケジュール読み込み状況を更新"""
         try:
-            if (
-                hasattr(self, "smt_status_label")
-                and self.smt_status_label.winfo_exists()
-            ):
-                self.smt_status_label.config(text=f"SMT計画表: {status}", fg=color)
+            self.smt_status_label.config(text=f"SMT計画表: {status}", fg=color)
         except tk.TclError:
             pass
 
@@ -737,8 +733,9 @@ class AOIView(tk.Toplevel):
         """安全なSMTスケジュール読み込み状況更新（非同期処理用）"""
         try:
             if hasattr(self, "winfo_exists") and self.winfo_exists():
-                self.update_smt_status(status, color)
-        except (tk.TclError, AttributeError):
+                # メインスレッドで実行
+                self.after(0, lambda: self.update_smt_status(status, color))
+        except (tk.TclError, AttributeError, RuntimeError):
             pass
 
     def update_connection_status(self, connected: bool):
@@ -761,8 +758,9 @@ class AOIView(tk.Toplevel):
         """安全な接続状況更新（非同期処理用）"""
         try:
             if hasattr(self, "winfo_exists") and self.winfo_exists():
-                self.update_connection_status(connected)
-        except (tk.TclError, AttributeError):
+                # メインスレッドで実行
+                self.after(0, lambda: self.update_connection_status(connected))
+        except (tk.TclError, AttributeError, RuntimeError):
             pass
 
     def update_sqlite_status(self, connected: bool, db_type: str = "local"):
@@ -784,8 +782,9 @@ class AOIView(tk.Toplevel):
         """安全なSQLite接続状況更新（非同期処理用）"""
         try:
             if hasattr(self, "winfo_exists") and self.winfo_exists():
-                self.update_sqlite_status(connected, db_type)
-        except (tk.TclError, AttributeError):
+                # メインスレッドで実行
+                self.after(0, lambda: self.update_sqlite_status(connected, db_type))
+        except (tk.TclError, AttributeError, RuntimeError):
             pass
 
     def on_window_resize(self, event):
@@ -1169,11 +1168,13 @@ class AOIView(tk.Toplevel):
 
         # 座標画像を生成出力
         if self.data_directory:
-            output_dir: str = os.path.join(self.data_directory, self.current_lot_number)
+            output_dir: str = os.path.join(self.data_directory, defect.lot_number)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)  # ディレクトリがなければ作成
-            filename = f"{current_board_index}_{defect_number}"
-            self.export_canvas_image_with_markers(output_dir, filename, rf, defect_name)
+            filename = f"{defect.lot_number}_{current_board_index}_{defect_number}"
+            self.export_canvas_image_with_markers(
+                defect, output_dir, filename, font_size=12
+            )
 
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
@@ -1182,11 +1183,11 @@ class AOIView(tk.Toplevel):
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
 
-        # sqlteデータベースに登録
-        self.__insert_defect_info_to_db_async(self.defect_list)
-
         # キントーンにデータを登録
         self.post_kintone_record_async(self.defect_list)
+
+        # sqlteデータベースに登録
+        self.__insert_defect_info_to_db_async(self.defect_list)
 
     def delete_defect_info(self):
         selected_item = self.defect_listbox.selection()
@@ -1201,8 +1202,20 @@ class AOIView(tk.Toplevel):
             self.defect_list_delete(index, selected_item[0])
             self.rf_entry.delete(0, tk.END)
             self.defect_entry.delete(0, tk.END)
+            # 削除IDリストに追加
+            self.delete_defect_ids.append(defect_item.id)
             # データベースから削除
             self.__remove_defect_info_from_db_async(defect_item)
+            # 画像を削除
+            if self.data_directory:
+                output_dir: str = os.path.join(
+                    self.data_directory, defect_item.lot_number
+                )
+                filename = (
+                    f"{defect_item.lot_number}_{defect_item.current_board_index}_"
+                    f"{defect_item.defect_number}"
+                )
+                self.delete_exported_image(output_dir, filename)
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
@@ -1539,7 +1552,7 @@ class AOIView(tk.Toplevel):
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
 
-        # defect_listをCSVに保存
+        # SQLiteデータベース保存
         if len(self.defect_list) > 0:
             # データベースにアイテムを追加
             self.__insert_defect_info_to_db_async(self.defect_list)
@@ -1667,6 +1680,16 @@ class AOIView(tk.Toplevel):
             )
             return
 
+        # 差分を共有データベースにマージ
+        if self.sqlite_db_dir and self.shared_directory and self.db_name:
+            # マージ処理の実行
+            SqlOperations.merge_target_database(
+                self.sqlite_db_dir,
+                self.shared_directory,
+                self.db_name,
+                delete_defect_ids=self.delete_defect_ids,
+            )
+
     def is_validation_lot_name(self, lot_name: str) -> bool:
         """指図名のバリデーション"""
         if not lot_name:
@@ -1758,11 +1781,8 @@ class AOIView(tk.Toplevel):
         # キントーンAPIに接続されていない場合は終了
         if self.is_kintone_connected is False:
             # 🔧 修正: self.after()を使用してメインスレッドで実行
-            self.after(
-                0,
-                lambda: self.safe_update_status(
-                    "キントーンAPIに接続されていない為、レコードの登録が失敗しました。"
-                ),
+            self.safe_update_status(
+                "キントーンAPIに接続されていない為、レコードの登録が失敗しました。"
             )
             return
 
@@ -1779,16 +1799,13 @@ class AOIView(tk.Toplevel):
                 count = len(updated_defect_list)
                 # 🔧 修正: self.after()を使用してメインスレッドで実行
                 if count > 0:
-                    self.after(
-                        0,
-                        lambda: self.safe_update_status(
-                            "キントーンアプリにレコードを登録しました。"
-                        ),
+                    self.safe_update_status(
+                        "キントーンアプリにレコードを登録しました。"
                     )
             except Exception as e:
                 # 🔧 修正: self.after()を使用してメインスレッドでエラー処理
                 error_msg = f"API送信エラー: {e}"
-                self.after(0, lambda: self.safe_update_status(error_msg))
+                self.safe_update_status(error_msg)
                 print(error_msg)  # ログ出力のみ
 
         # 別スレッドで非同期処理
@@ -1815,16 +1832,11 @@ class AOIView(tk.Toplevel):
                 # キントーンにレコードを削除
                 self.kintone_client.delete_record(record_id)
                 # 🔧 修正: self.after()を使用してメインスレッドで実行
-                self.after(
-                    0,
-                    lambda: self.safe_update_status(
-                        "キントーンアプリからレコードを削除しました。"
-                    ),
-                )
+                self.safe_update_status("キントーンアプリからレコードを削除しました。")
             except Exception as e:
                 # 🔧 修正: self.after()を使用してメインスレッドでエラー処理
                 error_msg = f"API削除エラー: {e}"
-                self.after(0, lambda: self.safe_update_status(error_msg))
+                self.safe_update_status(error_msg)
                 print(error_msg)  # ログ出力のみ
 
         # 別スレッドで非同期処理
@@ -1833,14 +1845,14 @@ class AOIView(tk.Toplevel):
 
     def export_canvas_image_with_markers(
         self,
+        defect: DefectInfo,
         output_dir: str,
-        reference: str = None,
-        defect_name: str = None,
         filename: str = None,
-        marker_size: int = 20,
+        marker_size: int = 10,
         marker_color: str = "red",
         image_format: str = "PNG",
         quality: int = 95,
+        font_size: int = None,
     ):
         """
         Canvas内の画像に座標マーカーを描画した状態で画像を生成し、指定したディレクトリに保存する
@@ -1850,10 +1862,11 @@ class AOIView(tk.Toplevel):
             reference (str): リファレンス情報（画像下部に表示）。Noneの場合は表示しない
             defect_name (str): 不良名（画像下部に表示）。Noneの場合は表示しない
             filename (str): 出力ファイル名（拡張子なし）。Noneの場合は"元ファイル名_marked_タイムスタンプ"を使用
-            marker_size (int): マーカーのサイズ（直径、ピクセル単位）デフォルト20
+            marker_size (int): マーカーのサイズ（直径、ピクセル単位）デフォルト10
             marker_color (str): マーカーの色（PIL形式: "red", "#FF0000"など）デフォルト"red"
             image_format (str): 画像フォーマット（"PNG", "JPEG", "BMP"など）デフォルト"PNG"
             quality (int): 画像品質（1-100、JPEGの場合は品質、PNGの場合は圧縮レベル0-9に変換）デフォルト95
+            font_size (int): テキストのフォントサイズ（ピクセル単位）。Noneの場合は画像サイズから自動計算
 
         Returns:
             str: 保存した画像のパス（保存に失敗した場合はNone）
@@ -1892,64 +1905,97 @@ class AOIView(tk.Toplevel):
 
             # 各不良のマーカーを描画
             marker_radius = marker_size // 2
-            for defect in self.defect_list:
-                # 相対座標を実際のピクセル座標に変換
-                pixel_x = defect.x * original_width
-                pixel_y = defect.y * original_height
+            # 相対座標を実際のピクセル座標に変換
+            pixel_x = defect.x * original_width
+            pixel_y = defect.y * original_height
 
-                # 楕円（マーカー）の境界ボックスを計算
-                left = pixel_x - marker_radius
-                top = pixel_y - marker_radius
-                right = pixel_x + marker_radius
-                bottom = pixel_y + marker_radius
+            # 楕円（マーカー）の境界ボックスを計算
+            left = pixel_x - marker_radius
+            top = pixel_y - marker_radius
+            right = pixel_x + marker_radius
+            bottom = pixel_y + marker_radius
 
-                # マーカーを描画（外枠と塗りつぶし）
-                draw.ellipse(
-                    [left, top, right, bottom], outline=marker_color, width=2, fill=None
-                )
+            # マーカーを描画（外枠と塗りつぶし）
+            draw.ellipse(
+                [left, top, right, bottom], outline=marker_color, width=2, fill=None
+            )
 
             # referenceとdefect_nameの描画（指定されている場合）
+            reference = defect.reference
+            defect_name = defect.defect_name
             if reference or defect_name:
-                # フォントサイズを画像サイズに応じて調整（最小30、最大80）
-                font_size = max(30, min(80, original_height // 20))
+                # フォントサイズの決定（引数が指定されていれば使用、なければ自動計算）
+                if font_size is None:
+                    # 画像サイズに応じて自動調整（最小30、最大80）
+                    calculated_font_size = max(30, min(80, original_height // 20))
+                else:
+                    # 引数で指定されたフォントサイズを使用（範囲制限: 10-200）
+                    calculated_font_size = max(10, min(200, font_size))
+
                 try:
                     # システムフォントを試行（日本語対応）
                     font = None
-                    # macOS/Linuxの日本語フォント候補
+                    # Windows/macOS/Linuxの日本語フォント候補
                     font_candidates = [
+                        # Windows日本語フォント
+                        "C:/Windows/Fonts/msgothic.ttc",  # MSゴシック
+                        "C:/Windows/Fonts/meiryo.ttc",  # メイリオ
+                        "C:/Windows/Fonts/YuGothM.ttc",  # 游ゴシック Medium
+                        "C:/Windows/Fonts/YuGothR.ttc",  # 游ゴシック Regular
+                        "C:/Windows/Fonts/msmincho.ttc",  # MS明朝
+                        # macOS日本語フォント
                         "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
                         "/System/Library/Fonts/Hiragino Sans GB.ttc",
+                        # Linux日本語フォント
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
                     ]
                     for font_path in font_candidates:
                         if os.path.exists(font_path):
-                            font = ImageFont.truetype(font_path, font_size)
-                            break
+                            try:
+                                font = ImageFont.truetype(
+                                    font_path, calculated_font_size
+                                )
+                                break
+                            except Exception as e:
+                                print(f"フォント読み込みエラー ({font_path}): {e}")
+                                continue
 
-                    # フォントが見つからない場合はデフォルトフォント
+                    # フォントが見つからない場合は警告
                     if font is None:
-                        font = ImageFont.load_default()
-                except Exception:
+                        print(
+                            "警告: 日本語フォントが見つかりませんでした。デフォルトフォントを使用します。"
+                        )
+                        # Pillow 10.0.0以降ではload_default()にsizeパラメータが使用可能
+                        try:
+                            font = ImageFont.load_default(size=calculated_font_size)
+                        except TypeError:
+                            # 古いバージョンのPillowの場合
+                            font = ImageFont.load_default()
+                except Exception as e:
                     # フォント読み込み失敗時はデフォルトフォント
-                    font = ImageFont.load_default()
+                    print(f"フォント初期化エラー: {e}")
+                    try:
+                        font = ImageFont.load_default(size=calculated_font_size)
+                    except TypeError:
+                        font = ImageFont.load_default()
 
                 # テキストの構築
                 text_lines = []
                 if reference:
-                    text_lines.append(f"Reference: {reference}")
+                    text_lines.append(f"リファレンス: {reference}")
                 if defect_name:
-                    text_lines.append(f"Defect: {defect_name}")
+                    text_lines.append(f"不良名: {defect_name}")
 
                 # 各行の描画位置を計算
                 line_height = font_size + 10
-                total_text_height = len(text_lines) * line_height + 20  # 上下マージン
+                total_text_height = len(text_lines) * line_height + 2  # 上下マージン
 
                 # テキスト背景の矩形を描画（半透明の黒背景）
                 text_bg_top = original_height - total_text_height
                 draw.rectangle(
                     [0, text_bg_top, original_width, original_height],
-                    fill=(0, 0, 0, 180),
+                    fill=(0, 0, 0, 20),
                 )
 
                 # テキストを描画
@@ -2017,9 +2063,92 @@ class AOIView(tk.Toplevel):
 
             success_msg = f"画像を保存しました: {output_filepath}"
             self.safe_update_status(success_msg)
+            print(str(output_filepath))
             return str(output_filepath)
 
         except Exception as e:
             error_msg = f"画像のエクスポートに失敗しました: {e}"
             self.safe_update_status(error_msg)
             return None
+
+    def delete_exported_image(
+        self, output_dir: str, filename: str, image_format: str = "PNG"
+    ):
+        """
+        export_canvas_image_with_markersで生成された画像ファイルを削除する
+
+        Args:
+            output_dir (str): 画像が保存されているディレクトリのパス
+            filename (str): 削除する画像のファイル名（拡張子なし）
+            image_format (str): 画像フォーマット（"PNG", "JPEG", "BMP"など）デフォルト"PNG"
+
+        Returns:
+            bool: 削除に成功した場合True、失敗した場合False
+        """
+        try:
+            # ファイルパスを構築
+            file_extension = image_format.lower()
+            output_path = Path(output_dir)
+
+            # ファイル名から拡張子を除去
+            base_filename = Path(filename).stem
+            target_filename = f"{base_filename}.{file_extension}"
+            target_filepath = output_path / target_filename
+
+            # ファイルが存在するか確認
+            if not target_filepath.exists():
+                warning_msg = f"削除対象のファイルが見つかりません: {target_filepath}"
+                self.safe_update_status(warning_msg)
+                print(warning_msg)
+                return False
+
+            # ファイルを削除
+            target_filepath.unlink()
+
+            success_msg = f"画像ファイルを削除しました: {target_filepath}"
+            self.safe_update_status(success_msg)
+            print(success_msg)
+            return True
+
+        except PermissionError as e:
+            error_msg = f"ファイル削除の権限がありません: {e}"
+            self.safe_update_status(error_msg)
+            print(error_msg)
+            return False
+        except Exception as e:
+            error_msg = f"画像ファイルの削除に失敗しました: {e}"
+            self.safe_update_status(error_msg)
+            print(error_msg)
+            return False
+
+    def remove_existing_defect_ids_from_delete_list(self):
+        """
+        self.defect_list内のidがself.delete_defect_idsに存在する場合、
+        self.delete_defect_idsから削除する
+
+        Returns:
+            int: 削除されたIDの数
+        """
+        if not self.delete_defect_ids:
+            return 0
+
+        # defect_listから全てのidを取得（存在するIDのセット）
+        existing_ids = {defect.id for defect in self.defect_list if defect.id}
+
+        # delete_defect_idsから存在するIDをフィルタリング（削除対象を特定）
+        ids_to_remove = [
+            defect_id
+            for defect_id in self.delete_defect_ids
+            if defect_id in existing_ids
+        ]
+
+        # 削除対象のIDをdelete_defect_idsから除外
+        for defect_id in ids_to_remove:
+            self.delete_defect_ids.remove(defect_id)
+
+        # 削除件数をログ出力
+        if ids_to_remove:
+            removed_count = len(ids_to_remove)
+            return removed_count
+
+        return 0

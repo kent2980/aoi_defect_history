@@ -8,3 +8,4 @@ wheels/
 
 # Virtual environments
 .venv
+aoi_data.db

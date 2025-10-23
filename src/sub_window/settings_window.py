@@ -88,7 +88,9 @@ class SettingsWindow(tk.Toplevel):
         )
 
         # 画像ディレクトリ設定
-        tk.Label(main_frame, text="画像ディレクトリ:").grid(row=1, column=0, sticky="w")
+        tk.Label(main_frame, text="基板画像ディレクトリ:").grid(
+            row=1, column=0, sticky="w"
+        )
         self.setting1_entry = tk.Entry(main_frame, width=50)
         self.setting1_entry.grid(row=1, column=1, padx=5, pady=5)
         if hasattr(self, "current_image_directory"):
@@ -98,7 +100,7 @@ class SettingsWindow(tk.Toplevel):
         )
 
         # データディレクトリ設定
-        tk.Label(main_frame, text="データディレクトリ:").grid(
+        tk.Label(main_frame, text="検査データ出力ディレクトリ:").grid(
             row=2, column=0, sticky="w"
         )
         self.setting2_entry = tk.Entry(main_frame, width=50)
@@ -110,7 +112,7 @@ class SettingsWindow(tk.Toplevel):
         )
 
         # スケジュールディレクトリ設定
-        tk.Label(main_frame, text="スケジュールディレクトリ:").grid(
+        tk.Label(main_frame, text="SMTスケジュールディレクトリ:").grid(
             row=3, column=0, sticky="w"
         )
         self.setting3_entry = tk.Entry(main_frame, width=50)
@@ -122,7 +124,9 @@ class SettingsWindow(tk.Toplevel):
         )
 
         # 共有ディレクトリ設定
-        tk.Label(main_frame, text="共有ディレクトリ:").grid(row=4, column=0, sticky="w")
+        tk.Label(main_frame, text="データ共有ディレクトリ:").grid(
+            row=4, column=0, sticky="w"
+        )
         self.setting4_entry = tk.Entry(main_frame, width=50)
         self.setting4_entry.grid(row=4, column=1, padx=5, pady=5)
         if hasattr(self, "current_shared_directory"):

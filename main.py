@@ -22,30 +22,9 @@ from src import AOIView
 def main():
     """メインエントリーポイント"""
     try:
-        # ルートウィンドウを作成（非表示）
-        root = tk.Tk()
-        root.withdraw()  # ルートウィンドウは非表示
-
-        # AOIViewを作成（UIはまだ作成されない）
-        aoi_view = None
-
-        def initialize_aoi_view():
-            """メインループ開始後にAOIViewを初期化"""
-            nonlocal aoi_view
-            aoi_view = AOIView(master=root, fillColor="red")
-
-            # AOIViewが閉じられたらアプリケーション終了
-            def on_aoi_close():
-                root.quit()
-                root.destroy()
-
-            aoi_view.protocol("WM_DELETE_WINDOW", on_aoi_close)
-
-        # メインループ開始後にAOIViewを初期化
-        root.after(100, initialize_aoi_view)
-
-        # アプリケーション開始
-        root.mainloop()
+        # AOIViewを作成して実行
+        app = AOIView(fillColor="red")
+        app.run()  # メインループを開始
 
     except Exception as e:
         import traceback
