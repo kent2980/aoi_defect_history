@@ -593,6 +593,26 @@ class AOIView(tk.Tk):
         )
         delete_button.pack(side=tk.LEFT, padx=10, pady=5)
 
+        # 修理ステータスラベル
+        # 修理ステータスフレーム
+        repair_status_frame = tk.Frame(self.info_frame)
+        repair_status_frame.pack(side=tk.RIGHT, padx=[0, 50])
+        self.repair_status_label = tk.Label(
+            repair_status_frame,
+            text="修理ステータス:",
+            font=("Yu Gothic UI", 12),
+        )
+        self.repair_status_label.pack(side=tk.LEFT)
+        self.repair_status_value = tk.Label(
+            repair_status_frame,
+            text="未修理",
+            font=("Yu Gothic UI", 12),
+            width=8,
+            anchor="w",
+            fg="red",
+        )
+        self.repair_status_value.pack(side=tk.LEFT)
+
         # 基板操作フレーム
         board_control_frame = tk.LabelFrame(
             self.info_frame, text="基板切替", font=("Yu Gothic UI", 10)
@@ -647,11 +667,11 @@ class AOIView(tk.Tk):
         self.defect_list_frame.pack_propagate(False)  # サイズ固定
 
         # Treeviewの作成
-        columns = ("No", "RF", "不良項目", "修理")
+        columns = ("No", "RF", "不良項目")
         self.defect_listbox = ttk.Treeview(
             self.defect_list_frame, columns=columns, show="headings"
         )
-        col_widths = {"No": 40, "RF": 80, "不良項目": 150, "修理": 40}
+        col_widths = {"No": 40, "RF": 80, "不良項目": 150}
         for col in columns:
             self.defect_listbox.heading(col, text=col)
             self.defect_listbox.column(col, width=col_widths[col], anchor="center")

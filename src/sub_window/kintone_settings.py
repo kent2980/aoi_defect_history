@@ -1,6 +1,7 @@
 import tkinter as tk
-from aoi_data_manager import FileManager
 from pathlib import Path
+
+from aoi_data_manager import FileManager
 
 
 class KintoneSettings(tk.Toplevel):
@@ -9,7 +10,6 @@ class KintoneSettings(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
         self.title("キントーン設定")
-        self.geometry("400x240")
         self.transient(parent)
         self.grab_set()
         # ここにキントーン設定用のウィジェットを追加
@@ -53,21 +53,21 @@ class KintoneSettings(tk.Toplevel):
         tk.Label(frame, text="APIトークン:").grid(
             row=0, column=0, sticky="e", padx=5, pady=5
         )
-        self.api_token_entry = tk.Entry(frame, width=30)
+        self.api_token_entry = tk.Entry(frame, width=50)
         self.api_token_entry.grid(row=0, column=1, padx=5, pady=5)
 
         # 例: ドメイン入力フィールド
         tk.Label(frame, text="サブドメイン:").grid(
             row=1, column=0, sticky="e", padx=5, pady=5
         )
-        self.subdomain_entry = tk.Entry(frame, width=30)
+        self.subdomain_entry = tk.Entry(frame, width=50)
         self.subdomain_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # 例: アプリID入力フィールド
         tk.Label(frame, text="アプリID:").grid(
             row=2, column=0, sticky="e", padx=5, pady=5
         )
-        self.app_id_entry = tk.Entry(frame, width=30)
+        self.app_id_entry = tk.Entry(frame, width=50)
         self.app_id_entry.grid(row=2, column=1, padx=5, pady=5)
 
     def create_buttons(self):
