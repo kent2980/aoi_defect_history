@@ -212,12 +212,15 @@ class AOIView(tk.Tk):
         # 差分を共有データベースにマージ
         if self.sqlite_db_dir and self.shared_directory and self.db_name:
             # マージ処理の実行
-            SqlOperations.merge_target_database(
-                self.sqlite_db_dir,
-                self.shared_directory,
-                self.db_name,
-                delete_defect_ids=self.delete_defect_ids,
-            )
+            try:
+                SqlOperations.merge_target_database(
+                    self.sqlite_db_dir,
+                    self.shared_directory,
+                    self.db_name,
+                    delete_defect_ids=self.delete_defect_ids,
+                )
+            except Exception as e:
+                print(f"共有データベースマージエラー: {e}")
         self.destroy()
 
     def __read_settings(self):
@@ -1584,6 +1587,14 @@ class AOIView(tk.Tk):
 
         # item_code, line_nameを取得する
         schedule_item = self.__search_schedule_df_item(self.current_lot_number)
+
+        # schedule_itemが見つからない場合
+        if not schedule_item:
+            messagebox.showwarning("Warning", "SMT計画表に指図が見つかりません。")
+            self.current_item_code = None
+            self.current_lot_number = None
+            return
+
         self.current_item_code = schedule_item.get("model_code")
         self.current_line_name = schedule_item.get("machine_name")
 
@@ -1684,12 +1695,15 @@ class AOIView(tk.Tk):
         # 差分を共有データベースにマージ
         if self.sqlite_db_dir and self.shared_directory and self.db_name:
             # マージ処理の実行
-            SqlOperations.merge_target_database(
-                self.sqlite_db_dir,
-                self.shared_directory,
-                self.db_name,
-                delete_defect_ids=self.delete_defect_ids,
-            )
+            try:
+                SqlOperations.merge_target_database(
+                    self.sqlite_db_dir,
+                    self.shared_directory,
+                    self.db_name,
+                    delete_defect_ids=self.delete_defect_ids,
+                )
+            except Exception as e:
+                messagebox.showerror("Error", "ネットワーク接続を確認してください。")
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
         """指図名のバリデーション"""
