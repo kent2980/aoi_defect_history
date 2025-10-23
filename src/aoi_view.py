@@ -315,6 +315,7 @@ class AOIView(tk.Tk):
         except Exception as e:
             print(f"SQLiteデータベース作成エラー: {e}")
             self.safe_update_sqlite_status(False, db_type)
+            messagebox.showerror("エラー", "ネットワーク接続を確認してください。")
 
     def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
         """不良情報を非同期でSQLiteデータベースに挿入"""
