@@ -432,6 +432,7 @@ class AOIView(tk.Tk):
         serial_label.pack(side=tk.LEFT, padx=10)
         self.serial_entry = tk.Entry(header_frame, font=font_value)
         self.serial_entry.pack(side=tk.LEFT, padx=10)
+        self.serial_entry.bind("<Return>", self.on_serial_enter)
 
         # right_frame
         right_frame = tk.Frame(header_frame)
@@ -1745,6 +1746,21 @@ class AOIView(tk.Tk):
         """ユーザー名が設定されているか確認"""
         user = self.aoi_user_label_value.cget("text")
         return bool(user)
+
+    def on_serial_enter(self, event):
+        """シリアルエントリでEnterキーが押されたときの処理"""
+        # 現在の基板インデックスを取得
+        board_index = self.current_board_index
+        serial = self.serial_entry.get()
+        # defect_list内の該当基板インデックスのシリアルを更新
+        for item in self.defect_list:
+            if item.current_board_index == board_index:
+                # シリアル番号を更新
+                item.serial = serial
+        # シリアルエントリの内容をクリア
+        self.serial_entry.delete(0, tk.END)
+        # ステータスバーを更新
+        self.update_status(f"シリアル番号を更新しました: {serial}")
 
     def convert_defect_name(self):
         """不良項目名を変換する"""
