@@ -107,6 +107,7 @@ class AOIView(tk.Tk):
         self.status_right_frame = None
         self.smt_status_label = None
         self.connection_label = None
+        self.sqlite_status_label = None
         self.photo_image = None
 
         # 画像とプロジェクト関連

@@ -940,7 +940,7 @@
         "kind": 6,
         "importPath": "src.aoi_view",
         "description": "src.aoi_view",
-        "peekOfCode": "class AOIView(tk.Toplevel):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"\n        super().__init__(master)",
+        "peekOfCode": "class AOIView(tk.Tk):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"\n        super().__init__()",
         "detail": "src.aoi_view",
         "documentation": {}
     },
@@ -949,7 +949,7 @@
         "kind": 5,
         "importPath": "src.aoi_view",
         "description": "src.aoi_view",
-        "peekOfCode": "PROJECT_DIR = get_project_dir()\nclass AOIView(tk.Toplevel):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"",
+        "peekOfCode": "PROJECT_DIR = get_project_dir()\nclass AOIView(tk.Tk):\n    \"\"\"AOI製品経歴書ウィンドウ\"\"\"\n    def __init__(self, fillColor=\"white\", master=None):\n        \"\"\"\n        コンストラクタ\n        ### Args:\n        - fillColor (str): 塗りつぶし色\n        - master (tk.Tk): 親ウィンドウ\n        \"\"\"",
         "detail": "src.aoi_view",
         "documentation": {}
     },
@@ -1156,7 +1156,7 @@
         "kind": 2,
         "importPath": "main",
         "description": "main",
-        "peekOfCode": "def main():\n    \"\"\"メインエントリーポイント\"\"\"\n    try:\n        # ルートウィンドウを作成（非表示）\n        root = tk.Tk()\n        root.withdraw()  # ルートウィンドウは非表示\n        # AOIViewを作成（UIはまだ作成されない）\n        aoi_view = None\n        def initialize_aoi_view():\n            \"\"\"メインループ開始後にAOIViewを初期化\"\"\"",
+        "peekOfCode": "def main():\n    \"\"\"メインエントリーポイント\"\"\"\n    try:\n        # AOIViewを作成して実行\n        app = AOIView(fillColor=\"red\")\n        app.run()  # メインループを開始\n    except Exception as e:\n        import traceback\n        error_msg = f\"アプリケーション開始エラー:\\n{str(e)}\\n\\n{traceback.format_exc()}\"\n        # エラーログファイルに出力",
         "detail": "main",
         "documentation": {}
     }
