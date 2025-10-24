@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import List
+from typing import List, Dict
 
 import pandas as pd
 from aoi_data_manager import (
@@ -105,6 +105,8 @@ class AOIView(tk.Tk):
         self.status_frame = None
         self.status_label = None
         self.status_right_frame = None
+        self.repair_status_label = None
+        self.repair_status_value = None
         self.smt_status_label = None
         self.connection_label = None
         self.sqlite_status_label = None
@@ -123,6 +125,7 @@ class AOIView(tk.Tk):
         self.defect_list: List[DefectInfo] = []
         self.repaird_list: List[RepairdInfo] = []
         self.delete_defect_ids: List[str] = []
+        self.serial_dict: Dict[str] = {}
 
         # 基板番号
         self.current_board_index = 1
@@ -563,7 +566,9 @@ class AOIView(tk.Tk):
             self.defect_info_frame, text="リファレンス: ", font=("Yu Gothic UI", 12)
         )
         rf_label.pack(side=tk.LEFT, padx=10)
-        self.rf_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
+        self.rf_entry = tk.Entry(
+            self.defect_info_frame, font=("Yu Gothic UI", 12), width=10
+        )
         self.rf_entry.pack(side=tk.LEFT, padx=10)
 
         # 不良項目
@@ -571,7 +576,9 @@ class AOIView(tk.Tk):
             self.defect_info_frame, text="不良項目: ", font=("Yu Gothic UI", 12)
         )
         defect_label.pack(side=tk.LEFT, padx=10)
-        self.defect_entry = tk.Entry(self.defect_info_frame, font=("Yu Gothic UI", 12))
+        self.defect_entry = tk.Entry(
+            self.defect_info_frame, font=("Yu Gothic UI", 12), width=14
+        )
         self.defect_entry.pack(side=tk.LEFT, padx=10)
         self.defect_entry.bind("<Return>", lambda event: self.convert_defect_name())
 
@@ -596,17 +603,17 @@ class AOIView(tk.Tk):
         # 修理ステータスラベル
         # 修理ステータスフレーム
         repair_status_frame = tk.Frame(self.info_frame)
-        repair_status_frame.pack(side=tk.RIGHT, padx=[0, 50])
+        repair_status_frame.pack(side=tk.RIGHT, padx=[0, 10], pady=[5, 0])
         self.repair_status_label = tk.Label(
             repair_status_frame,
             text="修理ステータス:",
-            font=("Yu Gothic UI", 12),
+            font=("Yu Gothic UI", 10),
         )
         self.repair_status_label.pack(side=tk.LEFT)
         self.repair_status_value = tk.Label(
             repair_status_frame,
             text="未修理",
-            font=("Yu Gothic UI", 12),
+            font=("Yu Gothic UI", 10),
             width=8,
             anchor="w",
             fg="red",
@@ -617,7 +624,7 @@ class AOIView(tk.Tk):
         board_control_frame = tk.LabelFrame(
             self.info_frame, text="基板切替", font=("Yu Gothic UI", 10)
         )
-        board_control_frame.pack(side=tk.RIGHT, padx=[0, 50])
+        board_control_frame.pack(side=tk.RIGHT, padx=[0, 5])
 
         # 基板Noラベル
         self.board_no_label = tk.Label(
@@ -1064,7 +1071,9 @@ class AOIView(tk.Tk):
     def defect_list_insert(self, item: DefectInfo):
         self.defect_list.append(item)
         self.defect_listbox.insert(
-            "", "end", values=[item.defect_number, item.reference, item.defect_name, ""]
+            "",
+            "end",
+            values=[item.defect_number, item.reference, item.defect_name, item.id],
         )
         self.defect_number_update()
 
@@ -1085,7 +1094,7 @@ class AOIView(tk.Tk):
         self.defect_list[index - 1] = item
         self.defect_listbox.item(
             self.defect_listbox.get_children()[index - 1],
-            values=[item.defect_number, item.reference, item.defect_name, ""],
+            values=[item.defect_number, item.reference, item.defect_name, item.id],
         )
         self.defect_number_update()
         # canvasの座標マーカーを削除
@@ -1146,7 +1155,6 @@ class AOIView(tk.Tk):
         defect_number = self.no_value.cget("text")  # 不良番号
         rf = self.rf_entry.get().upper()  # リファレンス
         defect_name = self.defect_entry.get()  # 不良項目
-        serial = self.serial_entry.get()  # シリアルNo
         aoi_user = self.aoi_user_label_value.cget("text")  # AOI担当
         model_code = self.current_item_code if self.current_item_code else ""
         lot_number = self.current_lot_number if self.current_lot_number else ""
@@ -1155,6 +1163,7 @@ class AOIView(tk.Tk):
         side_label = self.side_label_value.cget("text")
         model_label = model_name + " " + board_name
         board_label = model_label + " " + side_label
+        serial = self.serial_dict.get(self.current_board_index, "")
 
         # 相対座標を取得（既に相対座標として保存されている）
         rel_x, rel_y = (
@@ -1216,22 +1225,26 @@ class AOIView(tk.Tk):
         self.__insert_defect_info_to_db_async(self.defect_list)
 
     def delete_defect_info(self):
-        selected_item = self.defect_listbox.selection()
+        """削除ボタンを押したときの動作"""
+        # 選択中のアイテムを取得
+        selected_item = self.defect_listbox.focus()
         if selected_item:
             # Treeview内の全アイテムIDリスト
-            items = self.defect_listbox.get_children()
-            # インデックス（0始まり）
-            index = items.index(selected_item[0])
-            defect_item = self.defect_list[index]
-            kintone_record_id = defect_item.kintone_record_id
-            self.delete_kintone_record_async(kintone_record_id)
-            self.defect_list_delete(index, selected_item[0])
+            items = self.defect_listbox.item(selected_item, "values")
+            # 削除するアイテムのIDを取得
+            remove_id = items[3]
+            # defect_listから削除対象のアイテムを取得
+            defect_item = [item for item in self.defect_list if item.id == remove_id][0]
+            # ツリーからアイテムを削除
+            self.defect_listbox.delete(selected_item)
+            # リファレンス入力エリアを初期化
             self.rf_entry.delete(0, tk.END)
+            # 不良名入力エリアを初期化
             self.defect_entry.delete(0, tk.END)
-            # 削除IDリストに追加
-            self.delete_defect_ids.append(defect_item.id)
-            # データベースから削除
-            self.__remove_defect_info_from_db_async(defect_item)
+            # defect_listから対象のID要素を削除
+            self.defect_list = [
+                item for item in self.defect_list if item.id != remove_id
+            ]
             # 画像を削除
             if self.data_directory:
                 output_dir: str = os.path.join(
@@ -1242,6 +1255,45 @@ class AOIView(tk.Tk):
                     f"{defect_item.defect_number}"
                 )
                 self.delete_exported_image(output_dir, filename)
+            # defect_listの不良番号を振りなおす
+            defect_index = None
+            board_index = None
+            for item in self.defect_list:
+                if board_index != item.current_board_index:
+                    board_index = item.current_board_index
+                    defect_index = 1
+                # 画像ファイルをリネーム
+                ext = "png"
+                oldName = f"{item.lot_number}_{item.current_board_index}_{item.defect_number}.{ext}"
+                old_path = os.path.join(self.data_directory, item.lot_number, oldName)
+                newName = (
+                    f"{item.lot_number}_{item.current_board_index}_{defect_index}.{ext}"
+                )
+                newPath = os.path.join(self.data_directory, item.lot_number, newName)
+                os.rename(old_path, newPath)
+                # defect_numberを変更
+                item.defect_number = defect_index
+                defect_index = defect_index + 1
+            # 削除IDリストに追加
+            self.delete_defect_ids.append(remove_id)
+            # kintoneからレコードを削除
+            self.delete_kintone_record_async(defect_item.kintone_record_id)
+            # データベースから削除
+            self.__remove_defect_info_from_db_async(defect_item)
+            # キントーンにデータを更新
+            self.post_kintone_record_async(self.defect_list)
+            # sqlteデータベースを更新
+            self.__insert_defect_info_to_db_async(self.defect_list)
+            # ツリーのインデックスを振りなおす
+            index = 1
+            for item_id in self.defect_listbox.get_children():
+                values = list(
+                    self.defect_listbox.item(item_id, "values")
+                )  # タプル→リストに変換（変更しやすいように）
+                values[0] = str(index)
+                self.defect_listbox.item(item_id, values=values)
+                index = index + 1
+
             messagebox.showinfo("Info", "不良情報を削除しました。")
         else:
             messagebox.showwarning("Warning", "リストから不良情報を選択してください。")
@@ -1287,33 +1339,17 @@ class AOIView(tk.Tk):
         # defect_listboxをdefect_listの内容で更新
         self.defect_listbox.delete(*self.defect_listbox.get_children())
         for item in self.defect_list:
-            id = item.id
-            find_repaird = [r for r in self.repaird_list if r.id == id]
             if self.current_board_index == item.current_board_index:
-                if len(find_repaird) > 0:
-                    repaird_item = find_repaird[0]
-                    repaird_str = "済" if repaird_item.is_repaird == "修理済み" else ""
-                    self.defect_listbox.insert(
-                        "",
-                        "end",
-                        values=[
-                            item.defect_number,
-                            item.reference,
-                            item.defect_name,
-                            repaird_str,
-                        ],
-                    )
-                else:
-                    self.defect_listbox.insert(
-                        "",
-                        "end",
-                        values=[
-                            item.defect_number,
-                            item.reference,
-                            item.defect_name,
-                            "",
-                        ],
-                    )
+                self.defect_listbox.insert(
+                    "",
+                    "end",
+                    values=[
+                        item.defect_number,
+                        item.reference,
+                        item.defect_name,
+                        item.id,
+                    ],
+                )
         self.defect_number_update()
 
     def update_index(self):
@@ -1693,9 +1729,12 @@ class AOIView(tk.Tk):
             csv_path = self.read_csv_path()
             # csvパスが取得できたら不良リストを読み込み
             if csv_path:
+                # 基板番号を初期化
                 self.current_board_index = 1
-                # self.read_defect_list_csv(csv_path)
+                # データベースからdefectListを読み込む
                 self.read_defect_list_db()
+                # defectListからserial_dictを作成
+                self.create_serial_dict(self.defect_list)
                 self.update_index()
                 self.update_board_label()
                 self.defect_number_update()
@@ -1726,6 +1765,12 @@ class AOIView(tk.Tk):
                 )
             except Exception as e:
                 messagebox.showerror("Error", "ネットワーク接続を確認してください。")
+
+    def create_serial_dict(self, defect_list: List[DefectInfo]):
+        """defectListからシリアル辞書を作成する"""
+        self.serial_dict = {}
+        for item in defect_list:
+            self.serial_dict[item.current_board_index] = item.serial
 
     def is_validation_lot_name(self, lot_name: str) -> bool:
         """指図名のバリデーション"""
@@ -1777,10 +1822,16 @@ class AOIView(tk.Tk):
             if item.current_board_index == board_index:
                 # シリアル番号を更新
                 item.serial = serial
+        # シリアルを保存
+        self.serial_dict[self.current_board_index] = serial
         # シリアルエントリの内容をクリア
         self.serial_entry.delete(0, tk.END)
         # ステータスバーを更新
         self.update_status(f"シリアル番号を更新しました: {serial}")
+        # キントーンを更新
+        self.post_kintone_record_async(self.defect_list)
+        # データベースを更新
+        self.__insert_defect_info_to_db_async(self.defect_list)
 
     def convert_defect_name(self):
         """不良項目名を変換する"""
