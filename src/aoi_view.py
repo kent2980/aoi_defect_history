@@ -1091,7 +1091,12 @@ class AOIView(tk.Tk):
             messagebox.showerror("Error", "不良番号が不正です。")
             return
         index = int(index)
-        self.defect_list[index - 1] = item
+        list_index = 0
+        for i in self.defect_list:
+            if i.id == item.id:
+                break
+            list_index = list_index + 1
+        self.defect_list[list_index] = item
         self.defect_listbox.item(
             self.defect_listbox.get_children()[index - 1],
             values=[item.defect_number, item.reference, item.defect_name, item.id],
@@ -1163,6 +1168,7 @@ class AOIView(tk.Tk):
         side_label = self.side_label_value.cget("text")
         model_label = model_name + " " + board_name
         board_label = model_label + " " + side_label
+        board_number_label = f"{lot_number}_{current_board_index}"
         serial = self.serial_dict.get(self.current_board_index, "")
 
         # 相対座標を取得（既に相対座標として保存されている）
@@ -1194,6 +1200,7 @@ class AOIView(tk.Tk):
             lot_number=lot_number,
             model_label=model_label,
             board_label=board_label,
+            board_number_label=board_number_label,
         )
 
         if self.exists_defect_listbox(defect_number):
@@ -1202,14 +1209,23 @@ class AOIView(tk.Tk):
             self.defect_list_insert(defect)
 
         # 座標画像を生成出力
+        image_path = ""
         if self.data_directory:
-            output_dir: str = os.path.join(self.data_directory, defect.lot_number)
+            output_dir: str = os.path.join(self.data_directory, lot_number)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)  # ディレクトリがなければ作成
-            filename = f"{defect.lot_number}_{current_board_index}_{defect_number}"
-            self.export_canvas_image_with_markers(
+            filename = f"{lot_number}_{current_board_index}_{defect_number}"
+            image_path = self.export_canvas_image_with_markers(
                 defect, output_dir, filename, font_size=12
             )
+
+        # defectにimage_pathを設定
+        defect.image_path = image_path
+
+        if self.exists_defect_listbox(defect_number):
+            self.defect_list_update(defect_number, defect)
+        else:
+            self.defect_list_insert(defect)
 
         # 入力エントリを初期化
         self.rf_entry.delete(0, tk.END)
