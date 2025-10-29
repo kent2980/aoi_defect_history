@@ -23,10 +23,11 @@ wheels = [
 [[package]]
 name = "aoi-data-manager"
 version = "0.1.38"
-source = { git = "https://github.com/kent2980/aoi_data_manager.git#0b6b5e730ad20ddbb9258d19a7f8f2d847a812e1" }
+source = { git = "https://github.com/kent2980/aoi_data_manager.git#998410ea2250f1c491c11eb30040d56b3741b255" }
 dependencies = [
     { name = "numpy" },
     { name = "pandas" },
+    { name = "pillow" },
     { name = "requests" },
     { name = "sqlalchemy" },
     { name = "sqlmodel" },

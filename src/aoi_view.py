@@ -1215,9 +1215,21 @@ class AOIView(tk.Tk):
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)  # ディレクトリがなければ作成
             filename = f"{lot_number}_{current_board_index}_{defect_number}"
-            image_path = self.export_canvas_image_with_markers(
-                defect, output_dir, filename, font_size=12
-            )
+            try:
+                image_path = FileManager.export_canvas_image_with_markers(
+                    defect,
+                    self.current_image_path,
+                    output_dir,
+                    filename,
+                    marker_size=20,
+                    font_size=12,
+                    max_image_size=(800, 600),
+                    text_area_width=160,
+                )
+                success_msg = f"画像を保存しました: {image_path}"
+                self.safe_update_status(success_msg)
+            except ValueError as e:
+                self.update_status(e)
 
         # defectにimage_pathを設定
         defect.image_path = image_path
@@ -1270,7 +1282,11 @@ class AOIView(tk.Tk):
                     f"{defect_item.lot_number}_{defect_item.current_board_index}_"
                     f"{defect_item.defect_number}"
                 )
-                self.delete_exported_image(output_dir, filename)
+                try:
+                    msg = FileManager.delete_exported_image(output_dir, filename)
+                    self.update_status(msg)
+                except ValueError as e:
+                    self.update_status(e)
             # defect_listの不良番号を振りなおす
             defect_index = None
             board_index = None
@@ -1961,284 +1977,6 @@ class AOIView(tk.Tk):
         # 別スレッドで非同期処理
         thread = threading.Thread(target=_delete_request, daemon=True)
         thread.start()
-
-    def export_canvas_image_with_markers(
-        self,
-        defect: DefectInfo,
-        output_dir: str,
-        filename: str = None,
-        marker_size: int = 10,
-        marker_color: str = "red",
-        image_format: str = "PNG",
-        quality: int = 95,
-        font_size: int = None,
-    ):
-        """
-        Canvas内の画像に座標マーカーを描画した状態で画像を生成し、指定したディレクトリに保存する
-
-        Args:
-            output_dir (str): 出力先ディレクトリのパス
-            reference (str): リファレンス情報（画像下部に表示）。Noneの場合は表示しない
-            defect_name (str): 不良名（画像下部に表示）。Noneの場合は表示しない
-            filename (str): 出力ファイル名（拡張子なし）。Noneの場合は"元ファイル名_marked_タイムスタンプ"を使用
-            marker_size (int): マーカーのサイズ（直径、ピクセル単位）デフォルト10
-            marker_color (str): マーカーの色（PIL形式: "red", "#FF0000"など）デフォルト"red"
-            image_format (str): 画像フォーマット（"PNG", "JPEG", "BMP"など）デフォルト"PNG"
-            quality (int): 画像品質（1-100、JPEGの場合は品質、PNGの場合は圧縮レベル0-9に変換）デフォルト95
-            font_size (int): テキストのフォントサイズ（ピクセル単位）。Noneの場合は画像サイズから自動計算
-
-        Returns:
-            str: 保存した画像のパス（保存に失敗した場合はNone）
-        """
-        # 画像が開かれていない場合は終了
-        if not self.current_image_path or not os.path.exists(self.current_image_path):
-            self.safe_update_status(
-                "画像が開かれていないため、エクスポートできません。"
-            )
-            return None
-
-        # 不良データが存在しない場合は終了
-        if not self.defect_list:
-            self.safe_update_status(
-                "座標データが存在しないため、エクスポートできません。"
-            )
-            return None
-
-        # 出力ディレクトリの作成
-        output_path = Path(output_dir)
-        if not output_path.exists():
-            try:
-                output_path.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                error_msg = f"出力ディレクトリの作成に失敗しました: {e}"
-                self.safe_update_status(error_msg)
-                return None
-
-        try:
-            # 元の画像を開く
-            original_image = Image.open(self.current_image_path)
-            original_width, original_height = original_image.size
-
-            # 描画オブジェクトを作成
-            draw = ImageDraw.Draw(original_image)
-
-            # 各不良のマーカーを描画
-            marker_radius = marker_size // 2
-            # 相対座標を実際のピクセル座標に変換
-            pixel_x = defect.x * original_width
-            pixel_y = defect.y * original_height
-
-            # 楕円（マーカー）の境界ボックスを計算
-            left = pixel_x - marker_radius
-            top = pixel_y - marker_radius
-            right = pixel_x + marker_radius
-            bottom = pixel_y + marker_radius
-
-            # マーカーを描画（外枠と塗りつぶし）
-            draw.ellipse(
-                [left, top, right, bottom], outline=marker_color, width=2, fill=None
-            )
-
-            # referenceとdefect_nameの描画（指定されている場合）
-            reference = defect.reference
-            defect_name = defect.defect_name
-            if reference or defect_name:
-                # フォントサイズの決定（引数が指定されていれば使用、なければ自動計算）
-                if font_size is None:
-                    # 画像サイズに応じて自動調整（最小30、最大80）
-                    calculated_font_size = max(30, min(80, original_height // 20))
-                else:
-                    # 引数で指定されたフォントサイズを使用（範囲制限: 10-200）
-                    calculated_font_size = max(10, min(200, font_size))
-
-                try:
-                    # システムフォントを試行（日本語対応）
-                    font = None
-                    # Windows/macOS/Linuxの日本語フォント候補
-                    font_candidates = [
-                        # Windows日本語フォント
-                        "C:/Windows/Fonts/msgothic.ttc",  # MSゴシック
-                        "C:/Windows/Fonts/meiryo.ttc",  # メイリオ
-                        "C:/Windows/Fonts/YuGothM.ttc",  # 游ゴシック Medium
-                        "C:/Windows/Fonts/YuGothR.ttc",  # 游ゴシック Regular
-                        "C:/Windows/Fonts/msmincho.ttc",  # MS明朝
-                        # macOS日本語フォント
-                        "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
-                        "/System/Library/Fonts/Hiragino Sans GB.ttc",
-                        # Linux日本語フォント
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                    ]
-                    for font_path in font_candidates:
-                        if os.path.exists(font_path):
-                            try:
-                                font = ImageFont.truetype(
-                                    font_path, calculated_font_size
-                                )
-                                break
-                            except Exception as e:
-                                print(f"フォント読み込みエラー ({font_path}): {e}")
-                                continue
-
-                    # フォントが見つからない場合は警告
-                    if font is None:
-                        print(
-                            "警告: 日本語フォントが見つかりませんでした。デフォルトフォントを使用します。"
-                        )
-                        # Pillow 10.0.0以降ではload_default()にsizeパラメータが使用可能
-                        try:
-                            font = ImageFont.load_default(size=calculated_font_size)
-                        except TypeError:
-                            # 古いバージョンのPillowの場合
-                            font = ImageFont.load_default()
-                except Exception as e:
-                    # フォント読み込み失敗時はデフォルトフォント
-                    print(f"フォント初期化エラー: {e}")
-                    try:
-                        font = ImageFont.load_default(size=calculated_font_size)
-                    except TypeError:
-                        font = ImageFont.load_default()
-
-                # テキストの構築
-                text_lines = []
-                if reference:
-                    text_lines.append(f"リファレンス: {reference}")
-                if defect_name:
-                    text_lines.append(f"不良名: {defect_name}")
-
-                # 各行の描画位置を計算
-                line_height = font_size + 10
-                total_text_height = len(text_lines) * line_height + 2  # 上下マージン
-
-                # テキスト背景の矩形を描画（半透明の黒背景）
-                text_bg_top = original_height - total_text_height
-                draw.rectangle(
-                    [0, text_bg_top, original_width, original_height],
-                    fill=(0, 0, 0, 20),
-                )
-
-                # テキストを描画
-                y_position = text_bg_top + 10
-                for text_line in text_lines:
-                    draw.text((10, y_position), text_line, fill="white", font=font)
-                    y_position += line_height
-
-            # 出力ファイル名を生成
-            file_extension = image_format.lower()
-            if filename:
-                # ユーザー指定のファイル名を使用（拡張子は除去）
-                base_filename = Path(filename).stem
-                output_filename = f"{base_filename}.{file_extension}"
-            else:
-                # デフォルト: 元ファイル名 + タイムスタンプ
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                original_filename = Path(self.current_image_path).stem
-                output_filename = (
-                    f"{original_filename}_marked_{timestamp}.{file_extension}"
-                )
-
-            output_filepath = output_path / output_filename
-
-            # 画像形式に応じた保存オプションを設定
-            save_kwargs = {}
-            if image_format.upper() == "JPEG" or image_format.upper() == "JPG":
-                # JPEG: 品質を1-100で指定
-                save_kwargs["quality"] = max(1, min(100, quality))
-                save_kwargs["optimize"] = True
-                # JPEGはRGBモードが必要
-                if original_image.mode in ("RGBA", "LA", "P"):
-                    # 透明度がある場合は白背景に合成
-                    background = Image.new("RGB", original_image.size, (255, 255, 255))
-                    if original_image.mode == "P":
-                        original_image = original_image.convert("RGBA")
-                    background.paste(
-                        original_image,
-                        mask=(
-                            original_image.split()[-1]
-                            if original_image.mode in ("RGBA", "LA")
-                            else None
-                        ),
-                    )
-                    original_image = background
-                elif original_image.mode != "RGB":
-                    original_image = original_image.convert("RGB")
-            elif image_format.upper() == "PNG":
-                # PNG: 圧縮レベルを0-9で指定（qualityを100段階から9段階に変換）
-                compress_level = max(0, min(9, int((100 - quality) / 11)))
-                save_kwargs["compress_level"] = compress_level
-                save_kwargs["optimize"] = True
-            elif image_format.upper() == "BMP":
-                # BMP: 特別なオプションなし
-                pass
-            else:
-                # その他のフォーマット: 基本設定
-                if image_format.upper() in ("TIFF", "TIF"):
-                    save_kwargs["compression"] = "tiff_lzw"
-
-            # 画像を保存
-            original_image.save(
-                output_filepath, format=image_format.upper(), **save_kwargs
-            )
-
-            success_msg = f"画像を保存しました: {output_filepath}"
-            self.safe_update_status(success_msg)
-            print(str(output_filepath))
-            return str(output_filepath)
-
-        except Exception as e:
-            error_msg = f"画像のエクスポートに失敗しました: {e}"
-            self.safe_update_status(error_msg)
-            return None
-
-    def delete_exported_image(
-        self, output_dir: str, filename: str, image_format: str = "PNG"
-    ):
-        """
-        export_canvas_image_with_markersで生成された画像ファイルを削除する
-
-        Args:
-            output_dir (str): 画像が保存されているディレクトリのパス
-            filename (str): 削除する画像のファイル名（拡張子なし）
-            image_format (str): 画像フォーマット（"PNG", "JPEG", "BMP"など）デフォルト"PNG"
-
-        Returns:
-            bool: 削除に成功した場合True、失敗した場合False
-        """
-        try:
-            # ファイルパスを構築
-            file_extension = image_format.lower()
-            output_path = Path(output_dir)
-
-            # ファイル名から拡張子を除去
-            base_filename = Path(filename).stem
-            target_filename = f"{base_filename}.{file_extension}"
-            target_filepath = output_path / target_filename
-
-            # ファイルが存在するか確認
-            if not target_filepath.exists():
-                warning_msg = f"削除対象のファイルが見つかりません: {target_filepath}"
-                self.safe_update_status(warning_msg)
-                print(warning_msg)
-                return False
-
-            # ファイルを削除
-            target_filepath.unlink()
-
-            success_msg = f"画像ファイルを削除しました: {target_filepath}"
-            self.safe_update_status(success_msg)
-            print(success_msg)
-            return True
-
-        except PermissionError as e:
-            error_msg = f"ファイル削除の権限がありません: {e}"
-            self.safe_update_status(error_msg)
-            print(error_msg)
-            return False
-        except Exception as e:
-            error_msg = f"画像ファイルの削除に失敗しました: {e}"
-            self.safe_update_status(error_msg)
-            print(error_msg)
-            return False
 
     def remove_existing_defect_ids_from_delete_list(self):
         """
