@@ -15,7 +15,7 @@ from dataclasses import asdict
 from typing import List
 from aoi_data_manager import FileManager, KintoneClient, DefectInfo, RepairdInfo
 from .dialog import ChangeUserDialog, LotChangeDialog
-from .utils import get_project_dir, get_csv_file_path, get_config_file_path
+from .utils import get_project_dir, get_csv_file_path, get_config_file_path, load_env_file
 
 PROJECT_DIR = get_project_dir()
 
@@ -38,11 +38,29 @@ class RepairView(tk.Toplevel):
         self.image_directory = None
         self.data_directory = None
 
-        # Kintoneクライアントの初期化
+        # .envファイルを読み込む
+        load_env_file()
+
+        # Kintoneクライアントの初期化（.envから読み込み）
+        repair_subdomain = os.getenv("REPAIR_KINTONE_SUBDOMAIN")
+        repair_app_id = os.getenv("REPAIR_KINTONE_APP_ID")
+        repair_api_token = os.getenv("REPAIR_KINTONE_API_TOKEN")
+
+        if not all([repair_subdomain, repair_app_id, repair_api_token]):
+            raise ValueError(
+                "修理用Kintone設定が.envファイルに設定されていません。\n"
+                "REPAIR_KINTONE_SUBDOMAIN, REPAIR_KINTONE_APP_ID, REPAIR_KINTONE_API_TOKEN を設定してください。"
+            )
+
+        try:
+            repair_app_id = int(repair_app_id)
+        except ValueError:
+            raise ValueError("REPAIR_KINTONE_APP_IDは数値である必要があります。")
+
         self.repaird_kintone_client = KintoneClient(
-            subdomain="x7xhupqlzylc",
-            app_id=27,
-            api_token="69Yil0U13MGXORSZ5OLACJuGUnpEeTHcSxhy3Q0t",
+            subdomain=repair_subdomain,
+            app_id=repair_app_id,
+            api_token=repair_api_token,
         )
 
         # 設定読み込み

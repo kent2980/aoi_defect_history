@@ -25,7 +25,14 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from .dialog import ChangeUserDialog, ItemCodeChangeDialog, LotChangeDialog
 from .sub_window import KintoneSettings, SettingsWindow
-from .utils import get_config_file_path, get_csv_file_path, get_project_dir
+from .utils import (
+    get_config_file_path,
+    get_csv_file_path,
+    get_project_dir,
+    load_env_file,
+    sanitize_file_path,
+    validate_directory_path,
+)
 
 PROJECT_DIR = get_project_dir()
 
@@ -143,6 +150,9 @@ class AOIView(tk.Tk):
         self.shared_sqlite_db = None
         self.sqlite_db_dir = None
         self.shared_db_path = None
+
+        # .envファイルを読み込む
+        load_env_file()
 
         # UIの作成
         self.create_ui()
@@ -299,15 +309,17 @@ class AOIView(tk.Tk):
 
         try:
             if self.shared_directory:
-                self.shared_db_path = os.path.join(self.shared_directory, self.db_name)
-                if os.path.exists(self.shared_db_path):
+                # ファイルパスをサニタイズ
+                sanitized_shared_dir = validate_directory_path(self.shared_directory)
+                self.shared_db_path = sanitized_shared_dir / self.db_name
+                if self.shared_db_path.exists():
                     # 共有データをローカルにコピー
-                    shutil.copy(self.shared_db_path, self.sqlite_db_dir)
+                    shutil.copy(str(self.shared_db_path), str(self.sqlite_db_dir))
                     db_type = "共有"
                 else:
                     # 新しいデータベースを共有ディレクトリに作成
                     self.shared_sqlite_db = SqlOperations(
-                        self.shared_directory, self.db_name
+                        str(sanitized_shared_dir), self.db_name
                     )
                     self.shared_sqlite_db.create_tables()
                     db_type = "共有"
@@ -352,15 +364,47 @@ class AOIView(tk.Tk):
         thread.start()
 
     def init_kintone_client(self):
-        """キントーンクライアントの初期化"""
-        kintone_settings_path = get_config_file_path("kintone_settings.ini")
-        kintone_settings = FileManager.load_kintone_settings_file(
-            kintone_settings_path.as_posix()
-        )
+        """キントーンクライアントの初期化（環境変数から読み込み）"""
+        # 環境変数からKintone設定を取得
+        kintone_subdomain = os.getenv("KINTONE_SUBDOMAIN")
+        kintone_app_id = os.getenv("KINTONE_APP_ID")
+        kintone_api_token = os.getenv("KINTONE_API_TOKEN")
+
+        # 環境変数が設定されていない場合は、フォールバックとして設定ファイルを試行
+        if not all([kintone_subdomain, kintone_app_id, kintone_api_token]):
+            try:
+                kintone_settings_path = get_config_file_path("kintone_settings.ini")
+                if kintone_settings_path.exists():
+                    kintone_settings = FileManager.load_kintone_settings_file(
+                        kintone_settings_path.as_posix()
+                    )
+                    kintone_subdomain = kintone_subdomain or kintone_settings.get(
+                        "subdomain"
+                    )
+                    kintone_app_id = kintone_app_id or kintone_settings.get("app_id")
+                    kintone_api_token = kintone_api_token or kintone_settings.get(
+                        "api_token"
+                    )
+            except Exception as e:
+                print(f"警告: 設定ファイルの読み込みに失敗しました: {e}")
+
+        if not all([kintone_subdomain, kintone_app_id, kintone_api_token]):
+            # 設定が不完全な場合は、接続不可状態として初期化
+            self.kintone_client = None
+            self.is_kintone_connected = False
+            return
+
+        try:
+            kintone_app_id = int(kintone_app_id)
+        except ValueError:
+            # アラート
+            messagebox.showerror("エラー", "KintoneアプリIDが数値ではありません。")
+            return
+
         self.kintone_client = KintoneClient(
-            subdomain=kintone_settings.get("subdomain"),
-            app_id=kintone_settings.get("app_id"),
-            api_token=kintone_settings.get("api_token"),
+            subdomain=kintone_subdomain,
+            app_id=kintone_app_id,
+            api_token=kintone_api_token,
         )
 
     def kintone_connected_async(self) -> bool:
@@ -1211,9 +1255,14 @@ class AOIView(tk.Tk):
         # 座標画像を生成出力
         image_path = ""
         if self.data_directory:
-            output_dir: str = os.path.join(self.data_directory, lot_number)
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)  # ディレクトリがなければ作成
+            # ファイルパスをサニタイズ
+            sanitized_data_dir = validate_directory_path(self.data_directory)
+            output_dir_path = sanitized_data_dir / lot_number
+            output_dir: str = str(output_dir_path)
+            if not output_dir_path.exists():
+                output_dir_path.mkdir(
+                    parents=True, exist_ok=True
+                )  # ディレクトリがなければ作成
             filename = f"{lot_number}_{current_board_index}_{defect_number}"
             try:
                 image_path = FileManager.export_canvas_image_with_markers(
@@ -1275,9 +1324,10 @@ class AOIView(tk.Tk):
             ]
             # 画像を削除
             if self.data_directory:
-                output_dir: str = os.path.join(
-                    self.data_directory, defect_item.lot_number
-                )
+                # ファイルパスをサニタイズ
+                sanitized_data_dir = validate_directory_path(self.data_directory)
+                output_dir_path = sanitized_data_dir / defect_item.lot_number
+                output_dir: str = str(output_dir_path)
                 filename = (
                     f"{defect_item.lot_number}_{defect_item.current_board_index}_"
                     f"{defect_item.defect_number}"
@@ -1296,13 +1346,23 @@ class AOIView(tk.Tk):
                     defect_index = 1
                 # 画像ファイルをリネーム
                 ext = "png"
+                # ファイルパスをサニタイズ
+                sanitized_data_dir = validate_directory_path(self.data_directory)
+                lot_dir = sanitized_data_dir / item.lot_number
                 oldName = f"{item.lot_number}_{item.current_board_index}_{item.defect_number}.{ext}"
-                old_path = os.path.join(self.data_directory, item.lot_number, oldName)
+                old_path = lot_dir / oldName
                 newName = (
                     f"{item.lot_number}_{item.current_board_index}_{defect_index}.{ext}"
                 )
-                newPath = os.path.join(self.data_directory, item.lot_number, newName)
-                os.rename(old_path, newPath)
+                newPath = lot_dir / newName
+                # パストラバーサル攻撃を防ぐため、パスがlot_dir内にあることを確認
+                if (
+                    old_path.parent.resolve() == lot_dir.resolve()
+                    and newPath.parent.resolve() == lot_dir.resolve()
+                ):
+                    os.rename(str(old_path), str(newPath))
+                else:
+                    raise ValueError("パストラバーサル攻撃が検出されました")
                 # defect_numberを変更
                 item.defect_number = defect_index
                 defect_index = defect_index + 1
@@ -1702,10 +1762,16 @@ class AOIView(tk.Tk):
 
         # 画像ディレクトリからitem_codeから始まる画像を探して表示
         try:
+            # ファイルパスをサニタイズ
+            sanitized_image_dir = validate_directory_path(self.image_directory)
             filename = FileManager.get_image_path(
-                self.image_directory, self.current_lot_number, self.current_item_code
+                str(sanitized_image_dir),
+                self.current_lot_number,
+                self.current_item_code,
             )
-            self.current_image_path = os.path.join(self.image_directory, filename)
+            # ファイル名もサニタイズ（パストラバーサル対策）
+            sanitized_filename = sanitize_file_path(filename, str(sanitized_image_dir))
+            self.current_image_path = str(sanitized_filename)
 
             # 画像表示（defect_listが空であることを確認済み）
             self.open_select_image(self.current_image_path)

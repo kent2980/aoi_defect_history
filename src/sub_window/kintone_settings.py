@@ -90,28 +90,33 @@ class KintoneSettings(tk.Toplevel):
         subdomain = self.subdomain_entry.get()
         app_id = self.app_id_entry.get()
 
-        # ここで設定を保存する処理を追加
-        print("APIトークン:", api_token)
-        print("サブドメイン:", subdomain)
-        print("アプリID:", app_id)
+        # 入力検証
+        if not all([api_token, subdomain, app_id]):
+            messagebox.showwarning(
+                "警告", "すべての項目を入力してください。"
+            )
+            return
 
-        self.result = False
+        # 環境変数として設定（推奨方法）
+        # 注意: 現在のプロセスでのみ有効。永続化するには.envファイルを更新する必要がある
+        try:
+            os.environ["KINTONE_SUBDOMAIN"] = subdomain
+            os.environ["KINTONE_APP_ID"] = app_id
+            os.environ["KINTONE_API_TOKEN"] = api_token
 
-        # 設定ファイルを保存する
-        project_root = Path(__file__).resolve().parent.parent.parent
-        config_path = project_root / "kintone_settings.ini"
-        is_result = FileManager.create_kintone_settings_file(
-            settings_path=config_path,
-            api_token=api_token,
-            subdomain=subdomain,
-            app_id=app_id,
-        )
-        if is_result:
-            print("キントーン設定が保存されました。")
-        else:
-            print("キントーン設定の保存に失敗しました。")
+            messagebox.showinfo(
+                "情報",
+                "Kintone設定を環境変数に設定しました。\n"
+                "永続化するには、.envファイルに以下を追加してください：\n"
+                f"KINTONE_SUBDOMAIN={subdomain}\n"
+                f"KINTONE_APP_ID={app_id}\n"
+                f"KINTONE_API_TOKEN={api_token}"
+            )
 
-        self.result = True
+            self.result = True
+        except Exception as e:
+            messagebox.showerror("エラー", f"環境変数の設定に失敗しました: {e}")
+            self.result = False
 
         self.destroy()
 
@@ -122,11 +127,29 @@ class KintoneSettings(tk.Toplevel):
 
     def init_input_fields(self):
         """既存の設定を読み込み、入力フィールドに初期値を設定"""
-        project_root = Path(__file__).resolve().parent.parent.parent
-        config_path = project_root / "kintone_settings.ini"
-        config = FileManager.load_kintone_settings_file(config_path)
-        if config:
-            print(config)
-            self.api_token_entry.insert(0, config["api_token"])
-            self.subdomain_entry.insert(0, config["subdomain"])
-            self.app_id_entry.insert(0, config["app_id"])
+        # 環境変数から優先的に取得
+        api_token = os.getenv("KINTONE_API_TOKEN")
+        subdomain = os.getenv("KINTONE_SUBDOMAIN")
+        app_id = os.getenv("KINTONE_APP_ID")
+
+        # 環境変数が設定されていない場合は、フォールバックとして設定ファイルを試行
+        if not all([api_token, subdomain, app_id]):
+            try:
+                project_root = Path(__file__).resolve().parent.parent.parent
+                config_path = project_root / "kintone_settings.ini"
+                if config_path.exists():
+                    config = FileManager.load_kintone_settings_file(config_path)
+                    if config:
+                        api_token = api_token or config.get("api_token", "")
+                        subdomain = subdomain or config.get("subdomain", "")
+                        app_id = app_id or config.get("app_id", "")
+            except Exception as e:
+                print(f"警告: 設定ファイルの読み込みに失敗しました: {e}")
+
+        # 入力フィールドに値を設定
+        if api_token:
+            self.api_token_entry.insert(0, api_token)
+        if subdomain:
+            self.subdomain_entry.insert(0, subdomain)
+        if app_id:
+            self.app_id_entry.insert(0, app_id)

@@ -9,3 +9,7 @@ wheels/
 # Virtual environments
 .venv
 aoi_data.db
+
+.env
+
+kintone_settings.ini
