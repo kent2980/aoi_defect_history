@@ -1,4 +1,5 @@
 import configparser
+import logging
 import os
 import re
 import shutil
@@ -9,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import pandas as pd
 from aoi_data_manager import (
@@ -23,7 +24,16 @@ from ktec_smt_schedule import SMTSchedule
 from pandas import DataFrame
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
+from .constants import (
+    CSV_EXPORT_TIMEOUT,
+    MAX_IMAGE_HEIGHT,
+    MAX_IMAGE_WIDTH,
+    MAX_RETRIES,
+    RETRY_DELAY,
+    THREAD_POOL_MAX_WORKERS,
+)
 from .dialog import ChangeUserDialog, ItemCodeChangeDialog, LotChangeDialog
+from .logger_config import app_logger
 from .sub_window import KintoneSettings, SettingsWindow
 from .utils import (
     get_config_file_path,
@@ -35,6 +45,7 @@ from .utils import (
 )
 
 PROJECT_DIR = get_project_dir()
+logger = app_logger
 
 
 class AOIView(tk.Tk):
@@ -157,7 +168,7 @@ class AOIView(tk.Tk):
         # UIの作成
         self.create_ui()
 
-    def create_ui(self):
+    def create_ui(self) -> None:
         """UI要素を作成する"""
         # Kintoneクライアントの初期化
         self.init_kintone_client()
@@ -183,21 +194,21 @@ class AOIView(tk.Tk):
         # ディレクトリ未設定アラート表示
         self.__alert_not_directory_settings()
 
-    def run(self):
+    def run(self) -> None:
         """アプリケーションを起動してメインループを実行"""
         # メインループ開始後に非同期処理を開始
         self.after_idle(self._start_background_tasks)
         # メインループ開始
         self.mainloop()
 
-    def _start_background_tasks(self):
+    def _start_background_tasks(self) -> None:
         """バックグラウンドタスクを開始（メインループ開始後に実行）"""
         # キントーン接続確認（非同期）
         self.kintone_connected_async()
         # SMTスケジュール非同期読み込み開始
         self.__read_smt_schedule_async()
 
-    def __alert_not_directory_settings(self):
+    def __alert_not_directory_settings(self) -> None:
         """ディレクトリ未設定アラート表示（クラウドファースト構成）"""
         # shared_directoryは非推奨（クラウドファースト構成では不要）
         required_directories = [
@@ -215,14 +226,14 @@ class AOIView(tk.Tk):
                 f"{', '.join(missing_directories)}",
             )
 
-    def __before_close(self):
+    def __before_close(self) -> None:
         """閉じる前の処理（クラウドファースト構成）"""
         if len(self.defect_list) > 0:
             # Kintone APIに送信（主要なデータ保存先）
             try:
                 self.post_kintone_record_async(self.defect_list)
             except ValueError as e:
-                print(e)
+                logger.error(f"API送信エラー: {e}", exc_info=True)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
 
             # ローカルSQLiteに保存（キャッシュ/オフライン対応）
@@ -236,7 +247,7 @@ class AOIView(tk.Tk):
         # すべてのデータはKintone APIに保存されます
         self.destroy()
 
-    def __read_settings(self):
+    def __read_settings(self) -> None:
         """設定ファイルを読み込み（クラウドファースト構成）"""
         settings_path = get_config_file_path("settings.ini")
         if settings_path.exists():
@@ -257,15 +268,15 @@ class AOIView(tk.Tk):
                 )
                 if self.shared_directory:
                     # 警告を表示（非推奨）
-                    print(
-                        "警告: shared_directoryの設定は非推奨です。"
+                    logger.warning(
+                        "shared_directoryの設定は非推奨です。"
                         "クラウドファースト構成ではKintone APIを使用します。"
                     )
 
-    def __read_smt_schedule_async(self):
+    def __read_smt_schedule_async(self) -> None:
         """SMTスケジュールを非同期で読み込み"""
 
-        def _read_schedule():
+        def _read_schedule() -> None:
             """SMTスケジュールを読み込む"""
             try:
                 # ステータスバーの更新
@@ -298,15 +309,15 @@ class AOIView(tk.Tk):
             except Exception as e:
                 # エラー時の処理
                 error_msg = f"SMTスケジュール読み込みエラー: {e}"
+                logger.error(error_msg, exc_info=True)
                 self.safe_update_smt_status("エラー", "red")
                 self.safe_update_status(error_msg)
-                print(error_msg)
 
         # バックグラウンドスレッドで実行
         thread = threading.Thread(target=_read_schedule, daemon=True)
         thread.start()
 
-    def __create_sqlite_db(self):
+    def __create_sqlite_db(self) -> None:
         """
         SQLiteデータベースを作成（クラウドファースト構成）
 
@@ -327,14 +338,14 @@ class AOIView(tk.Tk):
             # 接続状態をステータスバーに反映
             self.safe_update_sqlite_status(db_connected, db_type)
         except Exception as e:
-            print(f"SQLiteデータベース作成エラー: {e}")
+            logger.error(f"SQLiteデータベース作成エラー: {e}", exc_info=True)
             self.safe_update_sqlite_status(False, db_type)
             # ローカルDBのエラーは警告のみ（Kintone APIが主要なため）
             self.safe_update_status(
                 "ローカルキャッシュの作成に失敗しました（Kintone APIは使用可能です）"
             )
 
-    def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
+    def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]) -> None:
         """不良情報を非同期でSQLiteデータベースに挿入"""
 
         def _task():
@@ -343,25 +354,25 @@ class AOIView(tk.Tk):
                 try:
                     self.sqlite_db.merge_insert_defect_infos(defect_info)
                 except Exception as e:
-                    print(f"データベースマージ挿入エラー: {e}")
+                    logger.error(f"データベースマージ挿入エラー: {e}", exc_info=True)
 
         thread = threading.Thread(target=_task, daemon=True)
         thread.start()
 
-    def __remove_defect_info_from_db_async(self, defect_info: DefectInfo):
+    def __remove_defect_info_from_db_async(self, defect_info: DefectInfo) -> None:
         """不良情報を非同期でSQLiteデータベースから削除"""
 
-        def _task():
+        def _task() -> None:
             if self.sqlite_db:
                 try:
                     self.sqlite_db.delete_defect_info(defect_info.id)
                 except Exception as e:
-                    print(f"データベース削除エラー: {e}")
+                    logger.error(f"データベース削除エラー: {e}", exc_info=True)
 
         thread = threading.Thread(target=_task, daemon=True)
         thread.start()
 
-    def init_kintone_client(self):
+    def init_kintone_client(self) -> None:
         """キントーンクライアントの初期化（環境変数から読み込み）"""
         # 環境変数からKintone設定を取得
         kintone_subdomain = os.getenv("KINTONE_SUBDOMAIN")
@@ -384,7 +395,9 @@ class AOIView(tk.Tk):
                         "api_token"
                     )
             except Exception as e:
-                print(f"警告: 設定ファイルの読み込みに失敗しました: {e}")
+                logger.warning(
+                    f"設定ファイルの読み込みに失敗しました: {e}", exc_info=True
+                )
 
         if not all([kintone_subdomain, kintone_app_id, kintone_api_token]):
             # 設定が不完全な場合は、接続不可状態として初期化
@@ -408,7 +421,7 @@ class AOIView(tk.Tk):
     def kintone_connected_async(self) -> bool:
         """キントーン接続を非同期で確認"""
 
-        def _check_connection():
+        def _check_connection() -> None:
             try:
                 connected = self.kintone_client.is_connected()
                 self.is_kintone_connected = connected
@@ -417,9 +430,9 @@ class AOIView(tk.Tk):
                 self.after(0, lambda: self.safe_update_status(status_msg))
             except Exception as e:
                 error_msg = f"キントーン接続エラー: {e}"
+                logger.error(error_msg, exc_info=True)
                 self.after(0, lambda: self.safe_update_connection_status(False))
                 self.after(0, lambda: self.safe_update_status(error_msg))
-                print(error_msg)
 
         # バックグラウンドスレッドで実行
         thread = threading.Thread(target=_check_connection, daemon=True)
@@ -1159,7 +1172,7 @@ class AOIView(tk.Tk):
                 return True
         return False
 
-    def read_defect_list_csv(self, filepath: str):
+    def read_defect_list_csv(self, filepath: str) -> None:
         """CSVファイルから不良リストを読み込み、defect_listに設定"""
         try:
             # ライブラリを使用して不良データを取得
@@ -1174,7 +1187,7 @@ class AOIView(tk.Tk):
         except Exception as e:
             raise Exception(e)
 
-    def read_defect_list_db(self):
+    def read_defect_list_db(self) -> None:
         """
         SQLiteデータベースから不良リストを読み込み、defect_listに設定
 
@@ -1196,8 +1209,9 @@ class AOIView(tk.Tk):
                             self.sqlite_db.merge_insert_defect_infos(self.defect_list)
                         return
                 except Exception as e:
-                    print(
-                        f"Kintone APIからの読み込みに失敗しました（ローカルDBを使用）: {e}"
+                    logger.warning(
+                        f"Kintone APIからの読み込みに失敗しました（ローカルDBを使用）: {e}",
+                        exc_info=True,
                     )
 
             # フォールバック: ローカルSQLiteデータベースから読み込み
@@ -1233,10 +1247,10 @@ class AOIView(tk.Tk):
                 # Kintone APIから読み込む機能が実装されていない場合
                 return []
         except Exception as e:
-            print(f"Kintone APIからのデータ取得エラー: {e}")
+            logger.error(f"Kintone APIからのデータ取得エラー: {e}", exc_info=True)
             return []
 
-    def save_defect_info(self):
+    def save_defect_info(self) -> None:
         """保存ボタンを押したときの処理"""
 
         # データディレクトリが有効か確認
@@ -1325,7 +1339,7 @@ class AOIView(tk.Tk):
                     filename,
                     marker_size=20,
                     font_size=12,
-                    max_image_size=(800, 600),
+                    max_image_size=(MAX_IMAGE_WIDTH, MAX_IMAGE_HEIGHT),
                     text_area_width=160,
                 )
                 success_msg = f"画像を保存しました: {image_path}"
@@ -1354,7 +1368,7 @@ class AOIView(tk.Tk):
         # ローカルSQLiteにキャッシュとして登録（オフライン対応）
         self.__insert_defect_info_to_db_async(self.defect_list)
 
-    def delete_defect_info(self):
+    def delete_defect_info(self) -> None:
         """削除ボタンを押したときの動作"""
         # 選択中のアイテムを取得
         selected_item = self.defect_listbox.focus()
@@ -1577,10 +1591,7 @@ class AOIView(tk.Tk):
         result = {"success": False}
 
         def _export_to_csv():
-            max_retries = 3
-            retry_delay = 1.0  # 秒
-
-            for attempt in range(max_retries):
+            for attempt in range(MAX_RETRIES):
                 try:
                     FileManager.save_defect_csv(self.defect_list, file_path)
                     self.after(
@@ -1600,11 +1611,11 @@ class AOIView(tk.Tk):
                     return
 
                 except PermissionError as pe:
-                    if attempt < max_retries - 1:
-                        message = f"ファイルが使用中です。{retry_delay}秒後に再試行します... ({attempt + 1}/{max_retries})"
-                        print(message)
+                    if attempt < MAX_RETRIES - 1:
+                        message = f"ファイルが使用中です。{RETRY_DELAY}秒後に再試行します... ({attempt + 1}/{MAX_RETRIES})"
+                        logger.warning(message)
                         self.after(0, lambda msg=message: self.safe_update_status(msg))
-                        time.sleep(retry_delay)
+                        time.sleep(RETRY_DELAY)
                         continue
                     else:
                         error_msg = (
@@ -1629,10 +1640,10 @@ class AOIView(tk.Tk):
                     return
 
         # ThreadPoolExecutorを使用して結果を取得
-        with ThreadPoolExecutor(max_workers=1) as executor:
+        with ThreadPoolExecutor(max_workers=THREAD_POOL_MAX_WORKERS) as executor:
             future = executor.submit(_export_to_csv)
             try:
-                future.result(timeout=30)  # 30秒でタイムアウト
+                future.result(timeout=CSV_EXPORT_TIMEOUT)
             except Exception as e:
                 self.after(
                     0,
@@ -1750,7 +1761,7 @@ class AOIView(tk.Tk):
             try:
                 self.post_kintone_record_async(self.defect_list)
             except ValueError as e:
-                print(e)
+                logger.error(f"API送信エラー: {e}", exc_info=True)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
 
         # ローカルSQLiteにキャッシュとして保存（オフライン対応）
@@ -1983,7 +1994,7 @@ class AOIView(tk.Tk):
                 self.defect_entry.delete(0, tk.END)
                 self.defect_entry.insert(0, standard_name)
         except Exception as e:
-            print(f"Error converting defect name: {e}")
+            logger.error(f"不良名変換エラー: {e}", exc_info=True)
 
     def show_defect_mapping(self):
         """不良名一覧を表示する"""
@@ -2012,7 +2023,7 @@ class AOIView(tk.Tk):
             self.init_kintone_client()
             self.kintone_connected_async()
 
-    def post_kintone_record_async(self, defect_list: List[DefectInfo]):
+    def post_kintone_record_async(self, defect_list: List[DefectInfo]) -> None:
         """Kintoneにレコードを送信する非同期処理"""
 
         # キントーンAPIに接続されていない場合は終了
@@ -2023,7 +2034,7 @@ class AOIView(tk.Tk):
             )
             return
 
-        def _send_request():
+        def _send_request() -> None:
             """Kintoneにレコードを送信する処理"""
             try:
                 # キントーンにレコードを送信
@@ -2042,14 +2053,14 @@ class AOIView(tk.Tk):
             except Exception as e:
                 # 🔧 修正: self.after()を使用してメインスレッドでエラー処理
                 error_msg = f"API送信エラー: {e}"
+                logger.error(error_msg, exc_info=True)
                 self.safe_update_status(error_msg)
-                print(error_msg)  # ログ出力のみ
 
         # 別スレッドで非同期処理
         thread = threading.Thread(target=_send_request, daemon=True)
         thread.start()
 
-    def delete_kintone_record_async(self, record_id: str):
+    def delete_kintone_record_async(self, record_id: str) -> None:
         """Kintoneレコードを削除"""
 
         # キントーンAPIに接続されていない場合は終了
@@ -2063,7 +2074,7 @@ class AOIView(tk.Tk):
             )
             return
 
-        def _delete_request():
+        def _delete_request() -> None:
             """Kintoneレコードを削除する処理"""
             try:
                 # キントーンにレコードを削除
@@ -2073,8 +2084,8 @@ class AOIView(tk.Tk):
             except Exception as e:
                 # 🔧 修正: self.after()を使用してメインスレッドでエラー処理
                 error_msg = f"API削除エラー: {e}"
+                logger.error(error_msg, exc_info=True)
                 self.safe_update_status(error_msg)
-                print(error_msg)  # ログ出力のみ
 
         # 別スレッドで非同期処理
         thread = threading.Thread(target=_delete_request, daemon=True)

@@ -98,62 +98,65 @@ def load_env_file():
 def sanitize_file_path(file_path: str, base_directory: str = None) -> Path:
     """
     ファイルパスをサニタイズして、パストラバーサル攻撃を防止する
-    
+
     Args:
         file_path (str): 検証するファイルパス
         base_directory (str, optional): ベースディレクトリ。指定された場合、このディレクトリ内のパスのみ許可
-    
+
     Returns:
         Path: サニタイズされたパス
-    
+
     Raises:
         ValueError: パストラバーサル攻撃が検出された場合
         PermissionError: ベースディレクトリ外へのアクセスが試みられた場合
     """
     # パスを正規化
-    normalized_path = PurePath(file_path).resolve()
-    
+    normalized_path = PurePath(file_path)
+
     # パストラバーサル攻撃のチェック（.. を含むパス）
     if ".." in str(normalized_path):
         raise ValueError(f"パストラバーサル攻撃の可能性があります: {file_path}")
-    
+
     # ベースディレクトリが指定されている場合、その中に含まれるかチェック
     if base_directory:
+        target_path = Path(base_directory) / normalized_path
         base_path = Path(base_directory).resolve()
         try:
             # パスがベースディレクトリ内にあるか確認
-            normalized_path.relative_to(base_path)
+            target_path.relative_to(base_path)
         except ValueError:
             raise PermissionError(
                 f"ベースディレクトリ外へのアクセスは許可されていません: {file_path}"
             )
-    
-    return Path(normalized_path)
+
+        return target_path
+    else:
+        return Path(normalized_path)
 
 
 def validate_directory_path(directory_path: str) -> Path:
     """
     ディレクトリパスを検証してサニタイズする
-    
+
     Args:
         directory_path (str): 検証するディレクトリパス
-    
+
     Returns:
         Path: サニタイズされたディレクトリパス
-    
+
     Raises:
         ValueError: 無効なパスの場合
     """
     if not directory_path or not directory_path.strip():
         raise ValueError("ディレクトリパスが空です")
-    
+
     sanitized = sanitize_file_path(directory_path)
-    
+
     # ディレクトリが存在するか確認（必須ではないが警告として）
     if not sanitized.exists():
         # 存在しない場合でもエラーにはしない（作成される可能性があるため）
         pass
-    
+
     return sanitized
 
 
