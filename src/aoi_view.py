@@ -198,47 +198,46 @@ class AOIView(tk.Tk):
         self.__read_smt_schedule_async()
 
     def __alert_not_directory_settings(self):
-        """ディレクトリ未設定アラート表示"""
-        if (
-            self.image_directory == ""
-            or self.data_directory == ""
-            or self.schedule_directory == ""
-            or self.shared_directory == ""
-        ):
+        """ディレクトリ未設定アラート表示（クラウドファースト構成）"""
+        # shared_directoryは非推奨（クラウドファースト構成では不要）
+        required_directories = [
+            ("画像ディレクトリ", self.image_directory),
+            ("データディレクトリ", self.data_directory),
+            ("スケジュールディレクトリ", self.schedule_directory),
+        ]
+
+        missing_directories = [name for name, path in required_directories if not path]
+
+        if missing_directories:
             messagebox.showwarning(
                 "ディレクトリ未設定",
-                "いずれかのディレクトリが設定されていません。設定ウィンドウでディレクトリを設定してください。",
+                f"以下のディレクトリが設定されていません。設定ウィンドウでディレクトリを設定してください。\n\n"
+                f"{', '.join(missing_directories)}",
             )
 
     def __before_close(self):
-        """閉じる前の処理"""
+        """閉じる前の処理（クラウドファースト構成）"""
         if len(self.defect_list) > 0:
+            # Kintone APIに送信（主要なデータ保存先）
             try:
                 self.post_kintone_record_async(self.defect_list)
             except ValueError as e:
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
-            # データベースにアイテムを追加
+
+            # ローカルSQLiteに保存（キャッシュ/オフライン対応）
             self.__insert_defect_info_to_db_async(self.defect_list)
+
             # SQLiteデータベースを閉じる
             if self.sqlite_db:
                 self.sqlite_db.close()
-        # 差分を共有データベースにマージ
-        if self.sqlite_db_dir and self.shared_directory and self.db_name:
-            # マージ処理の実行
-            try:
-                SqlOperations.merge_target_database(
-                    self.sqlite_db_dir,
-                    self.shared_directory,
-                    self.db_name,
-                    delete_defect_ids=self.delete_defect_ids,
-                )
-            except Exception as e:
-                print(f"共有データベースマージエラー: {e}")
+
+        # クラウドファースト構成では共有SQLiteデータベースへのマージは不要
+        # すべてのデータはKintone APIに保存されます
         self.destroy()
 
     def __read_settings(self):
-        """ """
+        """設定ファイルを読み込み（クラウドファースト構成）"""
         settings_path = get_config_file_path("settings.ini")
         if settings_path.exists():
             # 設定ファイルを読み込み
@@ -246,15 +245,22 @@ class AOIView(tk.Tk):
             config.read(settings_path, encoding="utf-8")
             # config["DIRECTORIES"]が存在する場合
             if "DIRECTORIES" in config:
-                # 例: 画像ディレクトリとデータディレクトリを取得
+                # 画像ディレクトリとデータディレクトリを取得
                 self.image_directory = config["DIRECTORIES"].get("image_directory", "")
                 self.data_directory = config["DIRECTORIES"].get("data_directory", "")
                 self.schedule_directory = config["DIRECTORIES"].get(
                     "schedule_directory", ""
                 )
+                # shared_directoryは非推奨（後方互換性のため読み込むが使用しない）
                 self.shared_directory = config["DIRECTORIES"].get(
                     "shared_directory", ""
                 )
+                if self.shared_directory:
+                    # 警告を表示（非推奨）
+                    print(
+                        "警告: shared_directoryの設定は非推奨です。"
+                        "クラウドファースト構成ではKintone APIを使用します。"
+                    )
 
     def __read_smt_schedule_async(self):
         """SMTスケジュールを非同期で読み込み"""
@@ -301,30 +307,19 @@ class AOIView(tk.Tk):
         thread.start()
 
     def __create_sqlite_db(self):
-        """SQLiteデータベースを作成"""
+        """
+        SQLiteデータベースを作成（クラウドファースト構成）
+
+        ローカルSQLiteはキャッシュ/オフライン対応としてのみ使用します。
+        主要なデータ保存先はKintone APIです。
+        """
         self.db_name = "aoi_data.db"
         db_connected = False
-        db_type = "local"
+        db_type = "キャッシュ"
         self.sqlite_db_dir = PROJECT_DIR
 
         try:
-            if self.shared_directory:
-                # ファイルパスをサニタイズ
-                sanitized_shared_dir = validate_directory_path(self.shared_directory)
-                self.shared_db_path = sanitized_shared_dir / self.db_name
-                if self.shared_db_path.exists():
-                    # 共有データをローカルにコピー
-                    shutil.copy(str(self.shared_db_path), str(self.sqlite_db_dir))
-                    db_type = "共有"
-                else:
-                    # 新しいデータベースを共有ディレクトリに作成
-                    self.shared_sqlite_db = SqlOperations(
-                        str(sanitized_shared_dir), self.db_name
-                    )
-                    self.shared_sqlite_db.create_tables()
-                    db_type = "共有"
-
-            # ローカルデータベースの作成
+            # ローカルデータベースの作成（キャッシュ/オフライン対応用）
             self.sqlite_db = SqlOperations(self.sqlite_db_dir, self.db_name)
             self.sqlite_db.create_tables()
             db_connected = True
@@ -334,7 +329,10 @@ class AOIView(tk.Tk):
         except Exception as e:
             print(f"SQLiteデータベース作成エラー: {e}")
             self.safe_update_sqlite_status(False, db_type)
-            messagebox.showerror("エラー", "ネットワーク接続を確認してください。")
+            # ローカルDBのエラーは警告のみ（Kintone APIが主要なため）
+            self.safe_update_status(
+                "ローカルキャッシュの作成に失敗しました（Kintone APIは使用可能です）"
+            )
 
     def __insert_defect_info_to_db_async(self, defect_info: List[DefectInfo]):
         """不良情報を非同期でSQLiteデータベースに挿入"""
@@ -436,6 +434,10 @@ class AOIView(tk.Tk):
         # ファイルメニュー
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="画像を開く", command=self.open_image)
+        file_menu.add_separator()
+        file_menu.add_command(
+            label="CSVにエクスポート", command=self.export_defect_list_to_csv
+        )
         menubar.add_cascade(label="ファイル", menu=file_menu)
         # 設定メニュー
         settings_menu = tk.Menu(menubar, tearoff=0)
@@ -1173,8 +1175,32 @@ class AOIView(tk.Tk):
             raise Exception(e)
 
     def read_defect_list_db(self):
-        """SQLiteデータベースから不良リストを読み込み、defect_listに設定"""
+        """
+        SQLiteデータベースから不良リストを読み込み、defect_listに設定
+
+        クラウドファースト構成では、Kintone APIから優先的に読み込みます。
+        オフライン時やKintone APIが利用できない場合のみローカルDBを使用します。
+        """
         try:
+            # まずKintone APIから読み込みを試行
+            if self.is_kintone_connected and self.kintone_client:
+                try:
+                    # Kintone APIから指図番号でデータを取得
+                    # 注意: aoi_data_managerにget_defect_records_by_lotのようなメソッドが必要
+                    # 現在は実装されていない可能性があるため、フォールバックとしてローカルDBを使用
+                    self.defect_list = self.__read_defect_list_from_kintone()
+                    if self.defect_list:
+                        self.update_defect_listbox()
+                        # ローカルDBにキャッシュとして保存
+                        if self.sqlite_db:
+                            self.sqlite_db.merge_insert_defect_infos(self.defect_list)
+                        return
+                except Exception as e:
+                    print(
+                        f"Kintone APIからの読み込みに失敗しました（ローカルDBを使用）: {e}"
+                    )
+
+            # フォールバック: ローカルSQLiteデータベースから読み込み
             if self.sqlite_db:
                 self.defect_list = self.sqlite_db.get_defect_info_by_lot(
                     self.current_lot_number
@@ -1182,6 +1208,33 @@ class AOIView(tk.Tk):
                 self.update_defect_listbox()
         except Exception as e:
             raise Exception(e)
+
+    def __read_defect_list_from_kintone(self) -> List[DefectInfo]:
+        """
+        Kintone APIから不良リストを取得
+
+        Returns:
+            List[DefectInfo]: 不良情報のリスト
+        """
+        try:
+            # aoi_data_managerのKintoneClientにget_defect_records_by_lotメソッドがあるか確認
+            # ない場合は、get_defect_recordsメソッドでフィルタリングする必要がある
+            if hasattr(self.kintone_client, "get_defect_records_by_lot"):
+                return self.kintone_client.get_defect_records_by_lot(
+                    self.current_lot_number
+                )
+            elif hasattr(self.kintone_client, "get_defect_records"):
+                # 全レコードを取得してフィルタリング
+                all_records = self.kintone_client.get_defect_records()
+                return [
+                    r for r in all_records if r.lot_number == self.current_lot_number
+                ]
+            else:
+                # Kintone APIから読み込む機能が実装されていない場合
+                return []
+        except Exception as e:
+            print(f"Kintone APIからのデータ取得エラー: {e}")
+            return []
 
     def save_defect_info(self):
         """保存ボタンを押したときの処理"""
@@ -1295,10 +1348,10 @@ class AOIView(tk.Tk):
         # 既存の座標マーカーを削除
         self.canvas.delete("coordinate_marker")
 
-        # キントーンにデータを登録
+        # クラウドファースト構成: Kintone APIに優先的に登録
         self.post_kintone_record_async(self.defect_list)
 
-        # sqlteデータベースに登録
+        # ローカルSQLiteにキャッシュとして登録（オフライン対応）
         self.__insert_defect_info_to_db_async(self.defect_list)
 
     def delete_defect_info(self):
@@ -1372,9 +1425,9 @@ class AOIView(tk.Tk):
             self.delete_kintone_record_async(defect_item.kintone_record_id)
             # データベースから削除
             self.__remove_defect_info_from_db_async(defect_item)
-            # キントーンにデータを更新
+            # クラウドファースト構成: Kintone APIに優先的に更新
             self.post_kintone_record_async(self.defect_list)
-            # sqlteデータベースを更新
+            # ローカルSQLiteにキャッシュとして更新
             self.__insert_defect_info_to_db_async(self.defect_list)
             # ツリーのインデックスを振りなおす
             index = 1
@@ -1495,34 +1548,52 @@ class AOIView(tk.Tk):
             return False
         return True
 
-    def defect_list_to_csv_async(self) -> bool:
+    def export_defect_list_to_csv(self) -> bool:
         """
-        非同期にdefect_listをCSVファイルに保存
+        不良リストをCSVファイルにエクスポート（クラウドファースト構成）
+
+        クラウドファースト構成では、CSVファイルはデータ保存先ではなく、
+        エクスポート機能としてのみ提供されます。
 
         Returns:
-            bool: 保存処理の成功/失敗を返す
+            bool: エクスポート処理の成功/失敗を返す
         """
+        if not self.defect_list:
+            messagebox.showinfo("情報", "エクスポートする不良データがありません。")
+            return False
+
+        # ファイル保存ダイアログを表示
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialfile=f"{self.current_lot_number}_{self.current_image_filename}.csv",
+            title="CSVファイルにエクスポート",
+        )
+
+        if not file_path:
+            return False
+
         # 結果を格納する変数
         result = {"success": False}
 
-        def _defect_list_to_csv():
+        def _export_to_csv():
             max_retries = 3
             retry_delay = 1.0  # 秒
-
-            file_path = FileManager.create_defect_csv_path(
-                self.data_directory,
-                self.current_lot_number,
-                self.current_image_filename,
-            )
 
             for attempt in range(max_retries):
                 try:
                     FileManager.save_defect_csv(self.defect_list, file_path)
-                    # 🔧 修正: 成功時はステータスを更新して終了
                     self.after(
                         0,
                         lambda: self.safe_update_status(
-                            f"不良データを保存しました: {os.path.basename(file_path)}"
+                            f"CSVファイルにエクスポートしました: {os.path.basename(file_path)}"
+                        ),
+                    )
+                    self.after(
+                        0,
+                        lambda: messagebox.showinfo(
+                            "エクスポート完了",
+                            f"CSVファイルにエクスポートしました:\n{file_path}",
                         ),
                     )
                     result["success"] = True
@@ -1530,14 +1601,12 @@ class AOIView(tk.Tk):
 
                 except PermissionError as pe:
                     if attempt < max_retries - 1:
-                        # 🔧 修正: リトライ時のメッセージ
                         message = f"ファイルが使用中です。{retry_delay}秒後に再試行します... ({attempt + 1}/{max_retries})"
                         print(message)
                         self.after(0, lambda msg=message: self.safe_update_status(msg))
                         time.sleep(retry_delay)
                         continue
                     else:
-                        # 🔧 修正: 最終的に失敗した場合
                         error_msg = (
                             f"ファイルが他のアプリケーション（Excel等）で開かれています。\n"
                             f"ファイルを閉じてから再試行してください:\n{file_path}"
@@ -1545,61 +1614,31 @@ class AOIView(tk.Tk):
                         self.after(
                             0,
                             lambda: messagebox.showerror(
-                                "ファイル保存エラー", error_msg
-                            ),
-                        )
-                        self.after(
-                            0,
-                            lambda: self.safe_update_status(
-                                "ファイル保存に失敗しました（ファイル使用中）"
+                                "エクスポートエラー", error_msg
                             ),
                         )
                         result["success"] = False
                         return
 
-                except OSError as oe:
-                    if oe.errno == 13:  # Permission denied
-                        error_msg = f"ファイルアクセス権限がありません: {file_path}"
-                        self.after(
-                            0,
-                            lambda: messagebox.showerror(
-                                "アクセス権限エラー", error_msg
-                            ),
-                        )
-                    else:
-                        error_msg = f"ファイル保存中にOSエラーが発生しました: {oe}"
-                        self.after(
-                            0, lambda: messagebox.showerror("OSエラー", error_msg)
-                        )
-                    self.after(
-                        0,
-                        lambda: self.safe_update_status(
-                            "ファイル保存に失敗しました（OSエラー）"
-                        ),
-                    )
-                    result["success"] = False
-                    return
-
                 except Exception as e:
-                    error_msg = f"ファイル保存中に予期しないエラーが発生しました: {e}"
-                    self.after(0, lambda: messagebox.showerror("保存エラー", error_msg))
+                    error_msg = f"CSVエクスポート中にエラーが発生しました: {e}"
                     self.after(
-                        0, lambda: self.safe_update_status("ファイル保存に失敗しました")
+                        0, lambda: messagebox.showerror("エクスポートエラー", error_msg)
                     )
                     result["success"] = False
                     return
 
         # ThreadPoolExecutorを使用して結果を取得
         with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_defect_list_to_csv)
+            future = executor.submit(_export_to_csv)
             try:
-                # スレッドの完了を待機（タイムアウト設定可能）
                 future.result(timeout=30)  # 30秒でタイムアウト
             except Exception as e:
                 self.after(
                     0,
                     lambda: messagebox.showerror(
-                        "保存エラー", f"保存処理がタイムアウトしました: {e}"
+                        "エクスポートエラー",
+                        f"エクスポート処理がタイムアウトしました: {e}",
                     ),
                 )
                 result["success"] = False
@@ -1636,22 +1675,27 @@ class AOIView(tk.Tk):
             self.__read_smt_schedule_async()
             # ディレクトリ未設定アラート表示
             self.__alert_not_directory_settings()
-            # SQLite接続状態を更新
+            # SQLite接続状態を更新（クラウドファースト構成ではキャッシュとして表示）
             if self.sqlite_db:
-                db_type = "共有" if self.shared_directory else "ローカル"
-                self.safe_update_sqlite_status(True, db_type)
+                self.safe_update_sqlite_status(True, "キャッシュ")
             else:
                 self.safe_update_sqlite_status(False, "")
+
+            # shared_directoryが設定されている場合は警告を表示（非推奨）
+            if self.shared_directory:
+                self.safe_update_status(
+                    "警告: 共有ディレクトリの設定は非推奨です。クラウドファースト構成ではKintone APIを使用します。"
+                )
             # 設定ファイルが存在しない場合は新規作成
             settings_path = get_config_file_path("settings.ini")
             if not settings_path.exists():
-                # 新しい設定を保存
+                # 新しい設定を保存（shared_directoryは空文字列として保存）
                 config = configparser.ConfigParser()
                 config["DIRECTORIES"] = {
                     "image_directory": new_settings[0],
                     "data_directory": new_settings[1],
                     "schedule_directory": new_settings[2],
-                    "shared_directory": new_settings[3],
+                    "shared_directory": "",  # クラウドファースト構成では不要
                 }
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
@@ -1659,10 +1703,13 @@ class AOIView(tk.Tk):
                 # 既存の設定ファイルを更新
                 config = configparser.ConfigParser()
                 config.read(settings_path, encoding="utf-8")
+                if "DIRECTORIES" not in config:
+                    config["DIRECTORIES"] = {}
                 config["DIRECTORIES"]["image_directory"] = new_settings[0]
                 config["DIRECTORIES"]["data_directory"] = new_settings[1]
                 config["DIRECTORIES"]["schedule_directory"] = new_settings[2]
-                config["DIRECTORIES"]["shared_directory"] = new_settings[3]
+                # shared_directoryは空文字列として保存（非推奨）
+                config["DIRECTORIES"]["shared_directory"] = ""
 
                 with open(settings_path, "w", encoding="utf-8") as configfile:
                     config.write(configfile)
@@ -1698,7 +1745,7 @@ class AOIView(tk.Tk):
             )
             return
 
-        # API送信
+        # クラウドファースト構成: Kintone APIに優先的に送信
         if len(self.defect_list) > 0:
             try:
                 self.post_kintone_record_async(self.defect_list)
@@ -1706,9 +1753,8 @@ class AOIView(tk.Tk):
                 print(e)
                 messagebox.showerror("送信エラー", f"API送信エラー:{e}")
 
-        # SQLiteデータベース保存
+        # ローカルSQLiteにキャッシュとして保存（オフライン対応）
         if len(self.defect_list) > 0:
-            # データベースにアイテムを追加
             self.__insert_defect_info_to_db_async(self.defect_list)
 
         # すべての座標マーカーを削除
@@ -1851,18 +1897,8 @@ class AOIView(tk.Tk):
             )
             return
 
-        # 差分を共有データベースにマージ
-        if self.sqlite_db_dir and self.shared_directory and self.db_name:
-            # マージ処理の実行
-            try:
-                SqlOperations.merge_target_database(
-                    self.sqlite_db_dir,
-                    self.shared_directory,
-                    self.db_name,
-                    delete_defect_ids=self.delete_defect_ids,
-                )
-            except Exception as e:
-                messagebox.showerror("Error", "ネットワーク接続を確認してください。")
+        # クラウドファースト構成では共有SQLiteデータベースへのマージは不要
+        # すべてのデータはKintone APIに保存されます
 
     def create_serial_dict(self, defect_list: List[DefectInfo]):
         """defectListからシリアル辞書を作成する"""
@@ -1926,9 +1962,9 @@ class AOIView(tk.Tk):
         self.serial_entry.delete(0, tk.END)
         # ステータスバーを更新
         self.update_status(f"シリアル番号を更新しました: {serial}")
-        # キントーンを更新
+        # クラウドファースト構成: Kintone APIに優先的に更新
         self.post_kintone_record_async(self.defect_list)
-        # データベースを更新
+        # ローカルSQLiteにキャッシュとして更新
         self.__insert_defect_info_to_db_async(self.defect_list)
 
     def convert_defect_name(self):

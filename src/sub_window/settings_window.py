@@ -123,21 +123,9 @@ class SettingsWindow(tk.Toplevel):
             row=3, column=2, padx=5
         )
 
-        # 共有ディレクトリ設定
-        tk.Label(main_frame, text="データ共有ディレクトリ:").grid(
-            row=4, column=0, sticky="w"
-        )
-        self.setting4_entry = tk.Entry(main_frame, width=50)
-        self.setting4_entry.grid(row=4, column=1, padx=5, pady=5)
-        if hasattr(self, "current_shared_directory"):
-            self.setting4_entry.insert(0, self.current_shared_directory)
-        tk.Button(main_frame, text="参照", command=self.select_shared_directory).grid(
-            row=4, column=2, padx=5
-        )
-
         # ボタンフレーム
         button_frame = tk.Frame(main_frame)
-        button_frame.grid(row=5, columnspan=3, pady=20)
+        button_frame.grid(row=4, columnspan=3, pady=20)
 
         # OKボタン
         ok_button = tk.Button(
@@ -183,17 +171,22 @@ class SettingsWindow(tk.Toplevel):
             self.setting3_entry.insert(0, directory)
 
     def select_shared_directory(self):
-        directory = filedialog.askdirectory(title="共有ディレクトリを選択してください")
-        if directory:
-            self.setting4_entry.delete(0, tk.END)
-            self.setting4_entry.insert(0, directory)
+        """
+        共有ディレクトリ選択（クラウドファースト構成では使用しない）
+        
+        このメソッドは後方互換性のため残していますが、実際には呼び出されません。
+        """
+        # クラウドファースト構成では共有ディレクトリは不要
+        pass
 
     def ok_clicked(self):
+        # クラウドファースト構成では共有ディレクトリは不要
+        # 後方互換性のため、空文字列を返す
         self.result = (
             self.setting1_entry.get(),
             self.setting2_entry.get(),
             self.setting3_entry.get(),
-            self.setting4_entry.get(),
+            "",  # shared_directoryは常に空文字列
         )
         self.destroy()
 
