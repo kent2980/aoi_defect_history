@@ -37,8 +37,10 @@ class AoiRepository:
         self.schedule_directory = schedule_directory
         self.image_root = image_root
         self.file_manager = FileManager()
-        self.kintone_client = KintoneClient()
-        self.sqlite_ops = SqlOperations()
+        self.kintone_client = None
+        self.sqlite_ops = None
+        self.init_kintone_client()
+        self.create_sqlite_db()
 
     def read_settings(self) -> None:
         """設定ファイルを読み込み（クラウドファースト構成）"""

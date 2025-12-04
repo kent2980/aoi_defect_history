@@ -1,11 +1,11 @@
 アプリケーション開始エラー:
-KINTONE_APP_IDは数値である必要があります。
+'AoiRepository' object has no attribute 'safe_update_sqlite_status'
 
 Traceback (most recent call last):
-  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\aoi_view.py", line 398, in init_kintone_client
-    kintone_app_id = int(kintone_app_id)
-                     ^^^^^^^^^^^^^^^^^^^
-ValueError: invalid literal for int() with base 10: 'your_app_id_here'
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\repository\AoiRepository.py", line 90, in create_sqlite_db
+    self.safe_update_sqlite_status(db_connected, db_type)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AoiRepository' object has no attribute 'safe_update_sqlite_status'
 
 During handling of the above exception, another exception occurred:
 
@@ -13,10 +13,12 @@ Traceback (most recent call last):
   File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\main.py", line 26, in main
     app = AOIView(fillColor="red")
           ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\aoi_view.py", line 158, in __init__
-    self.create_ui()
-  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\aoi_view.py", line 163, in create_ui
-    self.init_kintone_client()
-  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\aoi_view.py", line 400, in init_kintone_client
-    raise ValueError("KINTONE_APP_IDは数値である必要があります。")
-ValueError: KINTONE_APP_IDは数値である必要があります。
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\aoi_view.py", line 85, in __init__
+    self.repository = AoiRepository(
+                      ^^^^^^^^^^^^^^
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\repository\AoiRepository.py", line 43, in __init__
+    self.create_sqlite_db()
+  File "C:\Users\kentaroyoshida\vscode\app\aoi_defect_history\src\repository\AoiRepository.py", line 93, in create_sqlite_db
+    self.safe_update_sqlite_status(False, db_type)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AoiRepository' object has no attribute 'safe_update_sqlite_status'
